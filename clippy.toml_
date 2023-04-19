@@ -1,0 +1,4 @@
+disallowed-macros = [
+    { path = "quote::quote", reason = "no quoting" },
+    { path = "syn::parse_quote", reason = "no quoting" },
+]

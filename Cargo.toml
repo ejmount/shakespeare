@@ -1,0 +1,31 @@
+[package]
+name = "shakespeare"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "An actor framework"
+categories = ["asynchronous", "concurrency", "rust-patterns"]
+keywords = ["async", "macro", "futures"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+members = ["shakespeare-macro"]
+
+[workspace.package]
+version = "0.0.0"
+authors = ["Ewan Mount"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ejmount/shakespeare"
+edition = "2021"
+
+
+[dependencies]
+async-trait = "0.1.77"
+tokio = { version = "1.36.0", features = ["macros", "full"] }
+shakespeare-macro = { path = "shakespeare-macro", version = "=0.0.0" }
+
+
+[dev-dependencies]
+trybuild = "1.0.89"

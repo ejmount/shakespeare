@@ -1,0 +1,13 @@
+error[E0658]: non-inline modules in proc macro input are unstable
+ --> tests/fails/empty.rs:4:1
+  |
+4 | mod actor;
+  | ^^^^^^^^^^
+  |
+  = note: see issue #54727 <https://github.com/rust-lang/rust/issues/54727> for more information
+
+error: Actor declaration cannot be empty
+ --> tests/fails/empty.rs:4:1
+  |
+4 | mod actor;
+  | ^^^^^^^^^^

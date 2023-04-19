@@ -1,0 +1,21 @@
+error: Only one data item allowed in actor declaration
+ --> tests/fails/multiple_data.rs:5:2
+  |
+5 |     struct A {}
+  |     ^^^^^^^^^^^
+
+error: Only one data item allowed in actor declaration
+ --> tests/fails/multiple_data.rs:6:2
+  |
+6 | /     enum B {
+7 | |         Foo,
+8 | |     }
+  | |_____^
+
+error: Only one data item allowed in actor declaration
+  --> tests/fails/multiple_data.rs:9:2
+   |
+9  | /     enum C {
+10 | |         Bar,
+11 | |     }
+   | |_____^

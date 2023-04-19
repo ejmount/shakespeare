@@ -1,0 +1,7 @@
+error: Actor declaration must contain one struct, enum or union
+ --> tests/fails/missing_data.rs:4:1
+  |
+4 | / mod actor {
+5 | |     fn foo() {}
+6 | | }
+  | |_^

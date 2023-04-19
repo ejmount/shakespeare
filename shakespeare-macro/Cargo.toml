@@ -1,0 +1,22 @@
+[package]
+name = "shakespeare-macro"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A support crate for the shakespeare actor framework"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.76"
+quote = "1.0.35"
+syn = { version = "2.0.48", features = ["full", "fold", "extra-traits"] }
+
+convert_case = "0.6.0"
+itertools = "0.12.0"
+structmeta = "0.2.0"
