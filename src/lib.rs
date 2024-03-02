@@ -11,6 +11,9 @@
 #![forbid(clippy::todo)]
 #![forbid(clippy::unimplemented)]
 
+use std::any::Any;
+use std::future::Future;
+use std::panic::UnwindSafe;
 use std::sync::Arc;
 
 use ::tokio::sync::mpsc::error::SendError;
@@ -26,12 +29,15 @@ pub use crate::tokio::TokioUnbounded;
 #[derive(Debug)]
 pub struct ActorSpawn<T> {
 	pub actor:    Arc<T>,
-	_join_handle: JoinHandle<Result<(), ()>>,
+	_join_handle: JoinHandle<Result<(), Box<dyn Any + Send>>>,
 }
 
 impl<T> ActorSpawn<T> {
 	#[doc(hidden)]
-	pub fn new(actor: T, join_handle: JoinHandle<Result<(), ()>>) -> ActorSpawn<T> {
+	pub fn new(
+		actor: T,
+		join_handle: JoinHandle<Result<(), Box<dyn Any + Send>>>,
+	) -> ActorSpawn<T> {
 		ActorSpawn {
 			actor:        Arc::new(actor),
 			_join_handle: join_handle,
@@ -110,4 +116,13 @@ pub trait Channel {
 pub trait Role: 'static {
 	type Payload: Sized + Send;
 	type Channel: Channel<Item = Self::Payload>;
+}
+
+#[doc(hidden)]
+pub fn catch_future<T>(fut: T) -> impl Future<Output = Result<T::Output, Box<dyn Any + Send>>>
+where
+	T: Future + UnwindSafe,
+	T: UnwindSafe,
+{
+	futures::future::FutureExt::catch_unwind(fut)
 }

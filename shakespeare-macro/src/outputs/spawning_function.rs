@@ -74,20 +74,27 @@ impl SpawningFunction {
 		let fun: ItemImpl = fallible_quote! {
 			impl #data_name {
 				pub fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
-					use shakespeare::Channel;
+					use shakespeare::{ActorSpawn, Channel, catch_future};
+					use std::panic::AssertUnwindSafe;
 					#(#queue_constructions)*
 					let actor = #constructor;
 					let event_loop = async move {
 						loop {
-							let val = ::tokio::select! {
+							::tokio::select! {
 								#(#select_branches),*
-								else => { break Ok(()) }
-							};
-							val.await.map_err(|_| ())?;
+								else => { break; }
+							}.await;
 						}
 					};
-					let join_handle = ::tokio::task::spawn(event_loop);
-					::shakespeare::ActorSpawn::new(actor, join_handle)
+					// SAFETY: The receive handles inside the branches are not safe to unwind
+					// But they're consumed by the closure, so we can never see them
+					// The senders might interact with a dead receiver though.
+					// If we assume that a panic will not happen **during** an operation on the receiver,
+					// then the control block will still be consistent at any point the sender looks at it
+					// even during a panic
+					let caught_event_loop = catch_future(AssertUnwindSafe(event_loop));
+					let join_handle = ::tokio::task::spawn(caught_event_loop);
+					ActorSpawn::new(actor, join_handle)
 				}
 			}
 		}?;
