@@ -22,11 +22,10 @@ impl DispatchFunction {
 
 		let fun = fallible_quote! {
 			impl #data_name {
-				pub async fn #dispatch_method_name(&mut self, msg: #payload_type) -> Result<(), ()> {
-					let val = match msg {
+				pub async fn #dispatch_method_name(&mut self, msg: #payload_type)  {
+					match msg {
 						#(#arms),*
 					};
-					Ok(val)
 				}
 			}
 		}?;
@@ -48,7 +47,6 @@ fn dispatch_case(payload_type: &Path, fun: &FunctionItem) -> Result<Arm> {
 
 	let body = &fun.block;
 	fallible_quote! {
-		// #payload_type
-		#payload_type::#variant_name ((#(#patterns),*)) => #body,
+		#payload_type::#variant_name ((#(#patterns),*)) => { #body },
 	}
 }
