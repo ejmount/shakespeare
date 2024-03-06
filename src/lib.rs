@@ -13,7 +13,6 @@
 
 use std::any::Any;
 use std::future::Future;
-use std::panic::UnwindSafe;
 use std::sync::Arc;
 
 use ::tokio::sync::mpsc::error::SendError;
@@ -121,8 +120,7 @@ pub trait Role: 'static {
 #[doc(hidden)]
 pub fn catch_future<T>(fut: T) -> impl Future<Output = Result<T::Output, Box<dyn Any + Send>>>
 where
-	T: Future + UnwindSafe,
-	T: UnwindSafe,
+	T: Future,
 {
-	futures::future::FutureExt::catch_unwind(fut)
+	futures::future::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(fut))
 }
