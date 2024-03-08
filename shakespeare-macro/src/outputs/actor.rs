@@ -16,7 +16,6 @@ pub struct ActorOutput {
 	spawning_function: SpawningFunction,
 	performances:      Vec<PerfDispatch>,
 	roles:             Vec<RoleOutput>,
-	others:            Vec<ItemImpl>,
 }
 
 impl ActorOutput {
@@ -28,7 +27,6 @@ impl ActorOutput {
 			data_item,
 			performances,
 			roles,
-			others,
 			..
 		} = actor_node;
 
@@ -53,7 +51,6 @@ impl ActorOutput {
 			spawning_function: sf,
 			roles,
 			actor_struct,
-			others,
 		})
 	}
 }
@@ -68,9 +65,6 @@ impl ToTokens for ActorOutput {
 		}
 		for r in &self.roles {
 			r.to_tokens(tokens);
-		}
-		for o in &self.others {
-			o.to_tokens(tokens);
 		}
 	}
 }
