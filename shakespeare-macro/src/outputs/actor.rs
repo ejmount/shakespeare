@@ -1,5 +1,5 @@
 use quote::ToTokens;
-use syn::{ItemImpl, Result};
+use syn::Result;
 
 use crate::data::DataItem;
 use crate::declarations::actor::ActorDecl;

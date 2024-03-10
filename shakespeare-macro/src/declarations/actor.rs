@@ -1,10 +1,10 @@
 use itertools::Itertools;
-use syn::{parse_quote, Error, ImplItem, Item, ItemImpl, ItemMod, Visibility};
+use syn::{parse_quote, Error, ImplItem, Item, ItemMod, Visibility};
 
-use super::performance::{PerformanceAttribute, PerformanceDeclaration};
-use super::role::RoleDecl;
 use crate::data::{ActorName, DataItem};
+use crate::declarations::performance::PerformanceAttribute;
 use crate::macros::{fallible_quote, filter_unwrap};
+use crate::{PerformanceDeclaration, RoleDecl};
 
 enum ActorInternal {
 	Performance(PerformanceDeclaration),
@@ -26,23 +26,18 @@ static HANDLERS: &[fn(&Item) -> Fallible<ActorInternal>] =
 	&[read_performance as _, read_data_item as _];
 
 impl ActorDecl {
-	pub fn new(module: ItemMod) -> Result<ActorDecl, Error> {
-		let inline_err = Err(Error::new_spanned(
-			&module,
-			"Actor declaration cannot be empty",
-		));
-		let missing_err = Err(Error::new_spanned(
-			&module,
-			"Actor declaration must contain one struct, enum or union",
-		));
-		let Some((_, items)) = module.content else {
-			return inline_err;
+	pub fn new(module: &ItemMod) -> Result<ActorDecl, Error> {
+		let Some((_, items)) = &module.content else {
+			return Err(Error::new_spanned(
+				module,
+				"Actor declaration cannot be empty",
+			));
 		};
 
-		let actor_vis = module.vis;
+		let actor_vis = module.vis.clone();
 
-		let actor_name = module.ident;
-		let actor_path = fallible_quote! { #actor_name }?;
+		let actor_name = &module.ident;
+		let actor_name = fallible_quote! { #actor_name }?;
 
 		let mut performances = vec![];
 		let mut roles = vec![];
@@ -50,7 +45,7 @@ impl ActorDecl {
 
 		for item in items {
 			for handler in HANDLERS {
-				match handler(&item)? {
+				match handler(item)? {
 					Some(ActorInternal::CanonPerformance(perf, role)) => {
 						performances.push(perf);
 						roles.push(role);
@@ -64,7 +59,12 @@ impl ActorDecl {
 
 		let data_item = match data.into_iter().at_most_one() {
 			Ok(Some(item)) => item,
-			Ok(None) => return missing_err,
+			Ok(None) => {
+				return Err(Error::new_spanned(
+					module,
+					"Actor declaration must contain one struct, enum or union",
+				))
+			}
 			Err(extras) => {
 				let errors = extras.map(|d| {
 					Error::new_spanned(d, "Only one data item allowed in actor declaration")
@@ -76,7 +76,7 @@ impl ActorDecl {
 		assert!(!performances.is_empty(), "Empty perfs"); // Because [SpawningFunction] falls over otherwise
 
 		Ok(ActorDecl {
-			actor_name: actor_path,
+			actor_name,
 			actor_vis,
 			data_item,
 			performances,
@@ -86,6 +86,14 @@ impl ActorDecl {
 }
 
 fn read_performance(item: &Item) -> Fallible<ActorInternal> {
+	fn get_performance_tag(imp: &syn::ItemImpl) -> Option<&syn::Attribute> {
+		imp.attrs.iter().find(|attr| {
+			attr.path()
+				.segments
+				.last()
+				.is_some_and(|ps| ps.ident == "performance")
+		})
+	}
 	let syn::Item::Impl(imp) = item else {
 		return Ok(None);
 	};
@@ -114,15 +122,6 @@ fn read_data_item(item: &Item) -> Fallible<ActorInternal> {
 		return Ok(None);
 	};
 	Ok(Some(ActorInternal::Data(data_item)))
-}
-
-fn get_performance_tag(imp: &syn::ItemImpl) -> Option<&syn::Attribute> {
-	imp.attrs.iter().find(|attr| {
-		attr.path()
-			.segments
-			.last()
-			.is_some_and(|ps| ps.ident == "performance")
-	})
 }
 
 fn combine_errors(mut one: Error, another: Error) -> Error {
