@@ -11,13 +11,13 @@ pub struct PerformanceAttribute {
 	pub canonical: bool,
 }
 
-pub struct PerformanceDeclaration {
+pub struct PerformanceDecl {
 	pub role_name: RoleName,
 	pub handlers:  Vec<FunctionItem>,
 }
 
-impl PerformanceDeclaration {
-	pub fn new(role_name: Path, imp: ItemImpl) -> Result<PerformanceDeclaration> {
+impl PerformanceDecl {
+	pub fn new(role_name: Path, imp: ItemImpl) -> Result<PerformanceDecl> {
 		assert!(!role_name.segments.is_empty());
 
 		let handlers = filter_unwrap!(imp.items, ImplItem::Fn).collect_vec();
@@ -33,7 +33,7 @@ impl PerformanceDeclaration {
 
 		let role_name = RoleName::new(role_name);
 
-		Ok(PerformanceDeclaration {
+		Ok(PerformanceDecl {
 			role_name,
 			handlers,
 		})

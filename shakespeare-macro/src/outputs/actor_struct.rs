@@ -3,7 +3,7 @@ use syn::parse::Parser;
 use syn::{Expr, Field, ImplItemFn, ItemImpl, ItemStruct, Result, Visibility};
 
 use crate::declarations::actor::ActorDecl;
-use crate::declarations::performance::PerformanceDeclaration;
+use crate::declarations::performance::PerformanceDecl;
 use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
@@ -53,7 +53,7 @@ impl ToTokens for ActorStruct {
 	}
 }
 
-fn make_field_from_name(perf: &PerformanceDeclaration) -> Result<Field> {
+fn make_field_from_name(perf: &PerformanceDecl) -> Result<Field> {
 	let role_name = &perf.role_name;
 	let field_name = role_name.queue_name();
 
@@ -68,7 +68,7 @@ fn make_field_from_name(perf: &PerformanceDeclaration) -> Result<Field> {
 		})
 }
 
-fn make_accessor_from_name(perf: &PerformanceDeclaration, vis: &Visibility) -> Result<ImplItemFn> {
+fn make_accessor_from_name(perf: &PerformanceDecl, vis: &Visibility) -> Result<ImplItemFn> {
 	let role_name = &perf.role_name;
 	let payload_path = role_name.payload_path();
 	let field_name = role_name.queue_name();

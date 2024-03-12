@@ -1,14 +1,14 @@
 use itertools::Itertools;
-use syn::{parse_quote, Error, ImplItem, Item, ItemMod, Visibility};
+use syn::{parse_quote, Attribute, Error, ImplItem, Item, ItemImpl, ItemMod, Visibility};
 
 use crate::data::{ActorName, DataItem};
 use crate::declarations::performance::PerformanceAttribute;
 use crate::macros::{fallible_quote, filter_unwrap};
-use crate::{PerformanceDeclaration, RoleDecl};
+use crate::{PerformanceDecl, RoleDecl};
 
 enum ActorInternal {
-	Performance(PerformanceDeclaration),
-	CanonPerformance(PerformanceDeclaration, RoleDecl),
+	Performance(PerformanceDecl),
+	CanonPerformance(PerformanceDecl, RoleDecl),
 	Data(DataItem),
 }
 
@@ -16,7 +16,7 @@ pub struct ActorDecl {
 	pub actor_name:   ActorName,
 	pub actor_vis:    Visibility,
 	pub data_item:    DataItem,
-	pub performances: Vec<PerformanceDeclaration>,
+	pub performances: Vec<PerformanceDecl>,
 	pub roles:        Vec<RoleDecl>,
 }
 
@@ -86,7 +86,7 @@ impl ActorDecl {
 }
 
 fn read_performance(item: &Item) -> Fallible<ActorInternal> {
-	fn get_performance_tag(imp: &syn::ItemImpl) -> Option<&syn::Attribute> {
+	fn get_performance_tag(imp: &ItemImpl) -> Option<&Attribute> {
 		imp.attrs.iter().find(|attr| {
 			attr.path()
 				.segments
@@ -102,14 +102,14 @@ fn read_performance(item: &Item) -> Fallible<ActorInternal> {
 	};
 	let arg: PerformanceAttribute = attr.parse_args()?;
 	let canonical = arg.canonical;
-	let role_name = imp.trait_.clone().unwrap().1;
-	let perf = PerformanceDeclaration::new(role_name.clone(), imp.clone())?;
+	let role_name = &imp.trait_.as_ref().unwrap().1;
+	let perf = PerformanceDecl::new(role_name.clone(), imp.clone())?;
 	if canonical {
 		let signatures = filter_unwrap!(imp.items.iter(), ImplItem::Fn)
 			.map(|f| &f.sig)
 			.cloned();
 
-		let role = RoleDecl::new(role_name, parse_quote! {pub}, signatures);
+		let role = RoleDecl::new(role_name.clone(), parse_quote! {pub}, signatures);
 		Ok(ActorInternal::CanonPerformance(perf, role).into())
 	} else {
 		Ok(ActorInternal::Performance(perf).into())

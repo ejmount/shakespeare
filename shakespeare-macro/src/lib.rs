@@ -25,7 +25,7 @@ use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem};
 
 use crate::data::DataName;
 use crate::declarations::actor::ActorDecl;
-use crate::declarations::performance::PerformanceDeclaration;
+use crate::declarations::performance::PerformanceDecl;
 use crate::declarations::role::RoleDecl;
 use crate::macros::filter_unwrap;
 use crate::outputs::actor::ActorOutput;
@@ -54,7 +54,7 @@ fn make_performance(imp: ItemImpl) -> Result<PerfDispatch> {
 	};
 	let data_name = DataName::new(typath.path.clone());
 
-	let decl = PerformanceDeclaration::new(role_name.clone(), imp)?;
+	let decl = PerformanceDecl::new(role_name.clone(), imp)?;
 
 	let actor_path = data_name.actor_path();
 

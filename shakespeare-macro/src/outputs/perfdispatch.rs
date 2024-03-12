@@ -4,7 +4,7 @@ use syn::Result;
 use super::actor_role_perf::ActorPerf;
 use super::dispatch_core_fn::DispatchFunction;
 use crate::data::{ActorName, DataName};
-use crate::declarations::performance::PerformanceDeclaration;
+use crate::declarations::performance::PerformanceDecl;
 #[derive(Debug)]
 pub struct PerfDispatch {
 	actor_impl:  ActorPerf,
@@ -13,7 +13,7 @@ pub struct PerfDispatch {
 
 impl PerfDispatch {
 	pub fn new(
-		perf: &PerformanceDeclaration,
+		perf: &PerformanceDecl,
 		actor_path: &ActorName,
 		data_name: &DataName,
 	) -> Result<Option<PerfDispatch>> {

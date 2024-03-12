@@ -5,7 +5,7 @@ use syn::parse::Parser;
 use syn::{Expr, Field, ItemImpl, Result, Stmt};
 
 use crate::data::{ActorName, DataName, RoleName};
-use crate::declarations::performance::PerformanceDeclaration;
+use crate::declarations::performance::PerformanceDecl;
 use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
@@ -17,11 +17,11 @@ impl SpawningFunction {
 	pub fn new(
 		actor_name: &ActorName,
 		data_name: &DataName,
-		performances: &[PerformanceDeclaration],
+		performances: &[PerformanceDecl],
 	) -> Result<SpawningFunction> {
 		let field_names = performances
 			.iter()
-			.map(PerformanceDeclaration::get_role_name)
+			.map(PerformanceDecl::get_role_name)
 			.map(RoleName::queue_name)
 			.collect_vec();
 
