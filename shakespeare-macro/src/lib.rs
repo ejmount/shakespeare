@@ -32,7 +32,7 @@ use crate::outputs::actor::ActorOutput;
 use crate::outputs::perfdispatch::PerfDispatch;
 use crate::outputs::role::RoleOutput;
 
-fn make_actor(module: &ItemMod) -> Result<ActorOutput> {
+fn make_actor(module: ItemMod) -> Result<ActorOutput> {
 	ActorOutput::new(ActorDecl::new(module)?)
 }
 
@@ -79,7 +79,7 @@ fn make_role(imp: ItemTrait) -> Result<RoleOutput> {
 pub fn actor(_attr: TokenStream1, item: TokenStream1) -> TokenStream1 {
 	let module = syn::parse_macro_input!(item as ItemMod);
 
-	match make_actor(&module) {
+	match make_actor(module) {
 		Ok(actor_ouput) => actor_ouput.to_token_stream().into(),
 		Err(e) => e.into_compile_error().into_token_stream().into(),
 	}

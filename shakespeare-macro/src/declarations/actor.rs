@@ -26,22 +26,17 @@ static HANDLERS: &[fn(&Item) -> Fallible<ActorInternal>] =
 	&[read_performance as _, read_data_item as _];
 
 impl ActorDecl {
-	pub fn new(module: &ItemMod) -> Result<ActorDecl, Error> {
+	pub fn new(module: ItemMod) -> Result<ActorDecl, Error> {
+		let mut performances = vec![];
+		let mut roles = vec![];
+		let mut data = vec![];
+
 		let Some((_, items)) = &module.content else {
 			return Err(Error::new_spanned(
 				module,
 				"Actor declaration cannot be empty",
 			));
 		};
-
-		let actor_vis = module.vis.clone();
-
-		let actor_name = &module.ident;
-		let actor_name = fallible_quote! { #actor_name }?;
-
-		let mut performances = vec![];
-		let mut roles = vec![];
-		let mut data = vec![];
 
 		for item in items {
 			for handler in HANDLERS {
@@ -72,6 +67,11 @@ impl ActorDecl {
 				return Err(errors.reduce(combine_errors).unwrap());
 			}
 		};
+
+		let actor_vis = module.vis;
+
+		let actor_name = &module.ident;
+		let actor_name = fallible_quote! { #actor_name }?;
 
 		assert!(!performances.is_empty(), "Empty perfs"); // Because [SpawningFunction] falls over otherwise
 
