@@ -8,8 +8,9 @@ use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
 pub struct ActorStruct {
-	strukt:   ItemStruct,
-	accesors: ItemImpl,
+	strukt:     ItemStruct,
+	accesors:   ItemImpl,
+	meta_trait: ItemImpl,
 }
 
 impl ActorStruct {
@@ -18,6 +19,8 @@ impl ActorStruct {
 			actor_name,
 			performances,
 			actor_vis,
+			panic_handler,
+			exit_handler,
 			..
 		} = actor;
 
@@ -39,9 +42,37 @@ impl ActorStruct {
 			}
 		}?;
 
+		let unit_type = fallible_quote!(()).unwrap();
+		let panic_type =
+			fallible_quote!(std::boxed::Box<dyn std::any::Any + std::marker::Send>).unwrap();
+
+		let panic_return = panic_handler.as_ref().map_or(&panic_type, |f| {
+			if let syn::ReturnType::Type(_, ref b) = f.sig.output {
+				&**b
+			} else {
+				&unit_type
+			}
+		});
+
+		let exit_return = exit_handler.as_ref().map_or(&unit_type, |f| {
+			if let syn::ReturnType::Type(_, ref b) = f.sig.output {
+				&**b
+			} else {
+				&unit_type
+			}
+		});
+
+		let meta_trait = fallible_quote! {
+			impl ::shakespeare::ActorShell for #actor_name {
+				type ExitType = #exit_return;
+				type PanicType = #panic_return;
+			}
+		}?;
+
 		Ok(ActorStruct {
 			accesors: accessor_impl,
 			strukt,
+			meta_trait,
 		})
 	}
 }
@@ -49,6 +80,7 @@ impl ActorStruct {
 impl ToTokens for ActorStruct {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.strukt.to_tokens(tokens);
+		self.meta_trait.to_tokens(tokens);
 		self.accesors.to_tokens(tokens);
 	}
 }

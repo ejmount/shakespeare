@@ -2,7 +2,7 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{format_ident, ToTokens};
 use syn::parse::Parser;
-use syn::{Expr, Field, ItemImpl, Result, Stmt};
+use syn::{Expr, Field, Ident, ItemImpl, Result, Stmt};
 
 use crate::data::{ActorName, DataName, RoleName};
 use crate::declarations::performance::PerformanceDecl;
@@ -18,6 +18,8 @@ impl SpawningFunction {
 		actor_name: &ActorName,
 		data_name: &DataName,
 		performances: &[PerformanceDecl],
+		panic_name: Option<Ident>,
+		exit_name: Option<Ident>,
 	) -> Result<SpawningFunction> {
 		let field_names = performances
 			.iter()
@@ -71,6 +73,14 @@ impl SpawningFunction {
 			}
 		}?;
 
+		let run_panic_handler: Option<syn::Stmt> = panic_name
+			.map(|p| fallible_quote! { let result = result.map_err(#p); })
+			.transpose()?;
+
+		let run_exit_handler: Option<syn::Stmt> = exit_name
+			.map(|p| fallible_quote! { let result = result.map(#p); })
+			.transpose()?;
+
 		let fun: ItemImpl = fallible_quote! {
 			impl #data_name {
 				pub fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
@@ -85,7 +95,7 @@ impl SpawningFunction {
 						// If we assume that a panic will not happen **during** an operation on the receiver,
 						// then the control block will still be consistent at any point the sender looks at it
 						// even if the receiver was destroyed
-						catch_future(async {
+						let result = catch_future(async {
 							loop {
 								::tokio::select! {
 									#(#select_branches),*
@@ -94,7 +104,10 @@ impl SpawningFunction {
 								.await;
 							}
 						})
-						.await
+						.await;
+						#run_panic_handler
+						#run_exit_handler
+						result
 					};
 
 					let join_handle = ::tokio::task::spawn(event_loop);

@@ -1,5 +1,5 @@
 use quote::ToTokens;
-use syn::Result;
+use syn::{ItemFn, Result};
 
 use crate::data::DataItem;
 use crate::declarations::actor::ActorDecl;
@@ -14,6 +14,8 @@ pub struct ActorOutput {
 	data_item:         DataItem,
 	actor_struct:      ActorStruct,
 	spawning_function: SpawningFunction,
+	panic_handler:     Option<ItemFn>,
+	exit_handler:      Option<ItemFn>,
 	performances:      Vec<PerfDispatch>,
 	roles:             Vec<RoleOutput>,
 }
@@ -27,13 +29,23 @@ impl ActorOutput {
 			data_item,
 			performances,
 			roles,
+			panic_handler,
+			exit_handler,
 			..
 		} = actor_node;
 
 		let data_name = data_item.name();
+		let panic_name = panic_handler.as_ref().map(|i| i.sig.ident.clone());
+		let exit_name = exit_handler.as_ref().map(|i| i.sig.ident.clone());
 
 		assert!(!performances.is_empty());
-		let sf = SpawningFunction::new(&actor_name, &data_name, &performances)?;
+		let sf = SpawningFunction::new(
+			&actor_name,
+			&data_name,
+			&performances,
+			panic_name,
+			exit_name,
+		)?;
 
 		let roles = map_or_bail!(roles, RoleOutput::new);
 
@@ -51,6 +63,8 @@ impl ActorOutput {
 			spawning_function: sf,
 			roles,
 			actor_struct,
+			panic_handler,
+			exit_handler,
 		})
 	}
 }
@@ -60,6 +74,8 @@ impl ToTokens for ActorOutput {
 		self.actor_struct.to_tokens(tokens);
 		self.data_item.to_tokens(tokens);
 		self.spawning_function.to_tokens(tokens);
+		self.panic_handler.to_tokens(tokens);
+		self.exit_handler.to_tokens(tokens);
 		for p in &self.performances {
 			p.to_tokens(tokens);
 		}

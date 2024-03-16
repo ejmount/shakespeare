@@ -26,19 +26,22 @@ pub use crate::tokio::TokioUnbounded;
 
 #[non_exhaustive]
 #[derive(Debug)]
-pub struct ActorSpawn<T> {
-	pub actor:    Arc<T>,
-	_join_handle: JoinHandle<Result<(), Box<dyn Any + Send>>>,
+pub struct ActorSpawn<A>
+where
+	A: ActorShell,
+{
+	pub actor:    Arc<A>,
+	_join_handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
 }
 
-impl<T> ActorSpawn<T> {
+impl<A: ActorShell> ActorSpawn<A> {
 	#[doc(hidden)]
 	pub fn new(
-		actor: T,
-		join_handle: JoinHandle<Result<(), Box<dyn Any + Send>>>,
-	) -> ActorSpawn<T> {
+		shell: A,
+		join_handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
+	) -> ActorSpawn<A> {
 		ActorSpawn {
-			actor:        Arc::new(actor),
+			actor:        Arc::new(shell),
 			_join_handle: join_handle,
 		}
 	}
@@ -92,6 +95,12 @@ mod tokio {
 			unbounded_channel()
 		}
 	}
+}
+
+#[doc(hidden)]
+pub trait ActorShell {
+	type ExitType;
+	type PanicType;
 }
 
 #[doc(hidden)]
