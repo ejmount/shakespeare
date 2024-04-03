@@ -1,5 +1,7 @@
 use itertools::Itertools;
-use syn::{parse_quote, Attribute, Error, ImplItem, Item, ItemFn, ItemImpl, ItemMod, Visibility};
+use syn::{
+	parse_quote, Attribute, Error, ImplItem, Item, ItemFn, ItemImpl, ItemMod, Path, Visibility,
+};
 
 use crate::data::{ActorName, DataItem};
 use crate::declarations::performance::PerformanceAttribute;
@@ -58,10 +60,14 @@ impl ActorDecl {
 					Some(ActorInternal::Performance(perf)) => performances.push(perf),
 					Some(ActorInternal::Data(item)) => data.push(item),
 					Some(ActorInternal::PanicHandler(f)) => {
-						panic_handler.replace(f);
+						if let Some(panic_fn) = panic_handler.replace(f) {
+							return Err(Error::new_spanned(panic_fn, "Duplicate panic handler"));
+						}
 					}
 					Some(ActorInternal::ExitHandler(f)) => {
-						exit_handler.replace(f);
+						if let Some(exit_fn) = exit_handler.replace(f) {
+                            return Err(Error::new_spanned(exit_fn, "Duplicate exit handler"));
+                        }
 					}
 					None => continue,
 				}
@@ -84,16 +90,14 @@ impl ActorDecl {
 			}
 		};
 
-		let actor_vis = module.vis;
-
 		let actor_name = &module.ident;
-		let actor_name = fallible_quote! { #actor_name }?;
+		let actor_name: Path = fallible_quote! { #actor_name }?;
 
 		assert!(!performances.is_empty(), "Empty perfs"); // Because [SpawningFunction] falls over otherwise
 
 		Ok(ActorDecl {
 			actor_name,
-			actor_vis,
+			actor_vis: module.vis,
 			data_item,
 			panic_handler,
 			exit_handler,
@@ -122,7 +126,7 @@ fn read_performance(item: &Item) -> Fallible<ActorInternal> {
 	let canonical = arg.canonical;
 	let role_name = &imp.trait_.as_ref().unwrap().1;
 	let perf = PerformanceDecl::new(role_name.clone(), imp.clone())?;
-	if canonical {
+	if canonical.value() {
 		let signatures = filter_unwrap!(imp.items.iter(), ImplItem::Fn)
 			.map(|f| &f.sig)
 			.cloned();

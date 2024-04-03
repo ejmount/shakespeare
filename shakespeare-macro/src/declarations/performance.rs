@@ -8,7 +8,7 @@ use crate::macros::filter_unwrap;
 
 #[derive(structmeta::StructMeta)]
 pub struct PerformanceAttribute {
-	pub canonical: bool,
+	pub canonical: structmeta::Flag,
 }
 
 pub struct PerformanceDecl {
