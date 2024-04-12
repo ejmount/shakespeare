@@ -21,7 +21,7 @@ impl Fold for InterfaceRewriter {
 
 	fn fold_return_type(&mut self, _: ReturnType) -> ReturnType {
 		let role_name = &self.role_name;
-		parse_quote! {-> Result <(), <<<dyn #role_name as ::shakespeare::Role>::Channel as ::shakespeare::Channel>::Sender as ::shakespeare::RoleSender<<dyn #role_name as ::shakespeare::Role>::Payload>>::Error >}
+		parse_quote! {-> Result <(), ::shakespeare::Role2SendError<dyn #role_name>> }
 	}
 
 	fn fold_signature(&mut self, i: syn::Signature) -> syn::Signature {

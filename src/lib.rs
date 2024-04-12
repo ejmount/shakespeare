@@ -9,122 +9,30 @@
 //#![warn(unused_crate_dependencies)]
 #![forbid(unsafe_code)]
 #![forbid(clippy::todo)]
-#![forbid(clippy::unimplemented)]
+//#![forbid(clippy::unimplemented)]
 
 use std::any::Any;
 use std::future::Future;
-use std::sync::Arc;
 
-use ::tokio::sync::mpsc::error::SendError;
-use ::tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use ::tokio::task::JoinHandle;
-use async_trait::async_trait;
+#[doc(hidden)]
+pub use ::tokio as tokio_export;
 pub use shakespeare_macro::{actor, performance, role};
+#[doc(hidden)]
+pub use tokio::TokioUnbounded;
+
+mod core;
+mod tokio;
+
+pub use core::{ActorShell, ActorSpawn, Channel, Role, RoleReceiver, RoleSender};
 
 #[doc(hidden)]
-pub use crate::tokio::TokioUnbounded;
-
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct ActorSpawn<A>
-where
-	A: ActorShell,
-{
-	pub actor:    Arc<A>,
-	_join_handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
-}
-
-impl<A: ActorShell> ActorSpawn<A> {
-	#[doc(hidden)]
-	pub fn new(
-		shell: A,
-		join_handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
-	) -> ActorSpawn<A> {
-		ActorSpawn {
-			actor:        Arc::new(shell),
-			_join_handle: join_handle,
-		}
-	}
-}
-
+pub type Role2Payload<R> = <R as Role>::Payload;
 #[doc(hidden)]
-#[async_trait]
-pub trait RoleSender<T: Send>: Sync {
-	type Error;
-	async fn send(&self, msg: T) -> Result<(), Self::Error>;
-}
-
+pub type Role2Receiver<R> = <<R as Role>::Channel as Channel>::Receiver;
 #[doc(hidden)]
-#[async_trait]
-pub trait RoleReceiver<T: Send> {
-	async fn recv(&mut self) -> Option<T>;
-}
-
+pub type Role2Sender<R> = <<R as Role>::Channel as Channel>::Sender;
 #[doc(hidden)]
-mod tokio {
-	#[allow(clippy::wildcard_imports)]
-	use super::*;
-
-	#[async_trait]
-	impl<T: Send> RoleSender<T> for UnboundedSender<T> {
-		type Error = SendError<T>;
-
-		async fn send(&self, msg: T) -> Result<(), SendError<T>> {
-			self.send(msg)
-		}
-	}
-
-	#[async_trait]
-	impl<T: Send> RoleReceiver<T> for UnboundedReceiver<T> {
-		async fn recv(&mut self) -> Option<T> {
-			self.recv().await
-		}
-	}
-
-	#[doc(hidden)]
-	#[allow(clippy::module_name_repetitions)]
-	#[derive(Debug)]
-	pub struct TokioUnbounded<T>(std::marker::PhantomData<T>);
-	impl<T: Send> super::Channel for TokioUnbounded<T> {
-		type Input = ();
-		type Item = T;
-		type Receiver = UnboundedReceiver<T>;
-		type Sender = UnboundedSender<T>;
-
-		fn new((): ()) -> (UnboundedSender<T>, UnboundedReceiver<T>) {
-			unbounded_channel()
-		}
-	}
-}
-
-#[doc(hidden)]
-pub trait ActorShell {
-	type ExitType;
-	type PanicType;
-}
-
-#[doc(hidden)]
-pub trait Channel {
-	type Input;
-	type Item: Send + Sized;
-	type Sender: RoleSender<Self::Item>;
-	type Receiver: RoleReceiver<Self::Item>;
-	fn new(init: Self::Input) -> (Self::Sender, Self::Receiver);
-
-	#[must_use]
-	fn new_default() -> (Self::Sender, Self::Receiver)
-	where
-		Self::Input: Default,
-	{
-		Self::new(Self::Input::default())
-	}
-}
-
-#[doc(hidden)]
-pub trait Role: 'static {
-	type Payload: Sized + Send;
-	type Channel: Channel<Item = Self::Payload>;
-}
+pub type Role2SendError<R> = <Role2Sender<R> as RoleSender<<R as Role>::Payload>>::Error;
 
 #[doc(hidden)]
 pub fn catch_future<T>(fut: T) -> impl Future<Output = Result<T::Output, Box<dyn Any + Send>>>
