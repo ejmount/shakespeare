@@ -45,8 +45,8 @@ impl ActorStruct {
 
 		let accessor_impl = fallible_quote! {
 			impl #actor_name {
-				#(#accessors),*
-				#(#getters),*
+				#(#accessors)*
+				#(#getters)*
 			}
 		}?;
 

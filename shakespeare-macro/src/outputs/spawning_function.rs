@@ -61,7 +61,7 @@ impl SpawningFunction {
 			|(role, output)| -> Result<TokenStream> {
 				let fn_name = role.role_name.method_name();
 				fallible_quote! { Some(msg) = #output.recv() => {
-					state.#fn_name(msg)
+					state.#fn_name(msg).await
 				} }
 			}
 		);
@@ -101,7 +101,7 @@ impl SpawningFunction {
 									#(#select_branches),*
 									else => { break; }
 								}
-								.await;
+
 							}
 						})
 						.await;

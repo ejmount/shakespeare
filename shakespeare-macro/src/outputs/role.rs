@@ -41,7 +41,7 @@ impl RoleOutput {
 
 		let trait_definition = fallible_quote! {
 			#[::async_trait::async_trait]
-			#vis trait #role_name {
+			#vis trait #role_name: 'static + Send + Sync  {
 				#(#signatures;)*
 				#get_sender
 			}
