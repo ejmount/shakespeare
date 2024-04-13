@@ -1,7 +1,8 @@
+use itertools::Itertools;
 use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::fold::Fold;
-use syn::{FnArg, ItemImpl, Path, Result, Signature};
+use syn::{FnArg, ImplItemFn, ItemImpl, Path, Result, Signature};
 
 use crate::data::{ActorName, FunctionItem, RoleName};
 use crate::declarations::performance::make_variant_name;
@@ -17,7 +18,7 @@ impl ActorPerf {
 	pub fn new(
 		actor_path: &ActorName,
 		payload_type: &Path,
-		role_name: RoleName,
+		role_name: &RoleName,
 		handlers: &[FunctionItem],
 	) -> Result<ActorPerf> {
 		let accessor = role_name.acccessor_name();
@@ -27,16 +28,29 @@ impl ActorPerf {
 			&accessor
 		));
 
+		let mut rewriter = InterfaceRewriter::new(role_name);
+		let sending_methods = sending_methods
+			.into_iter()
+			.map(|i| rewriter.fold_impl_item_fn(i))
+			.collect_vec();
+
+		let getter_name = role_name.sender_getter_name();
+
+		let sender_get: ImplItemFn = fallible_quote! {
+			fn get_sender(&self) -> &::shakespeare::Role2Sender<dyn #role_name> {
+				self.#getter_name()
+			}
+		}?;
+
 		let output = (!sending_methods.is_empty()).then_some(fallible_quote! {
 			#[::async_trait::async_trait]
 			impl #role_name for #actor_path {
 				#(#sending_methods)*
+				#sender_get
 			}
 		}?);
 
-		let imp = output.map(|output| InterfaceRewriter::new(role_name).fold_item_impl(output));
-
-		Ok(ActorPerf { imp })
+		Ok(ActorPerf { imp: output })
 	}
 }
 

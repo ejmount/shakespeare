@@ -78,7 +78,7 @@ impl SpawningFunction {
 			.transpose()?;
 
 		let run_exit_handler: Option<syn::Stmt> = exit_name
-			.map(|p| fallible_quote! { let result = result.map(#p); })
+			.map(|p| fallible_quote! { let result = result.map(|_| #p(state)); })
 			.transpose()?;
 
 		let fun: ItemImpl = fallible_quote! {

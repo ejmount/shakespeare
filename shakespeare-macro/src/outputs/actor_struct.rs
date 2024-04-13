@@ -2,6 +2,7 @@ use quote::{quote, ToTokens};
 use syn::parse::Parser;
 use syn::{Field, ImplItemFn, ItemImpl, ItemStruct, Path, Result, Visibility};
 
+use crate::data::RoleName;
 use crate::declarations::actor::ActorDecl;
 use crate::declarations::performance::PerformanceDecl;
 use crate::macros::{fallible_quote, map_or_bail};
@@ -27,7 +28,13 @@ impl ActorStruct {
 		let fields = map_or_bail!(performances, make_field_from_name);
 
 		let accessors = map_or_bail!(performances, |perf| make_accessor_from_name(
-			perf, actor_vis
+			perf.get_role_name(),
+			actor_vis
+		));
+
+		let getters = map_or_bail!(performances, |perf| make_sender_getter_from_name(
+			perf.get_role_name(),
+			actor_vis
 		));
 
 		let strukt = fallible_quote! {
@@ -39,6 +46,7 @@ impl ActorStruct {
 		let accessor_impl = fallible_quote! {
 			impl #actor_name {
 				#(#accessors),*
+				#(#getters),*
 			}
 		}?;
 
@@ -98,8 +106,7 @@ fn make_field_from_name(perf: &PerformanceDecl) -> Result<Field> {
 		})
 }
 
-fn make_accessor_from_name(perf: &PerformanceDecl, vis: &Visibility) -> Result<ImplItemFn> {
-	let role_name = &perf.role_name;
+fn make_accessor_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
 	let payload_path = role_name.payload_path();
 	let field_name = role_name.queue_name();
 
@@ -111,6 +118,19 @@ fn make_accessor_from_name(perf: &PerformanceDecl, vis: &Visibility) -> Result<I
 		#vis async fn #acccessor_name(&self, payload: #payload_path) -> Result<(), #error_path>
 		{
 			self.#field_name.send(payload)
+		}
+	}
+}
+
+fn make_sender_getter_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
+	let field_name = role_name.queue_name();
+
+	let getter_name = role_name.sender_getter_name();
+
+	fallible_quote! {
+		#vis fn #getter_name(&self) -> &::shakespeare::Role2Sender<dyn #role_name>
+		{
+			&self.#field_name
 		}
 	}
 }

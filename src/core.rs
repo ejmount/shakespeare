@@ -9,8 +9,8 @@ pub struct ActorSpawn<A>
 where
 	A: ActorShell,
 {
-	pub actor:    Arc<A>,
-	_join_handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
+	pub actor:       Arc<A>,
+	pub join_handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
 }
 
 impl<A: ActorShell> ActorSpawn<A> {
@@ -20,15 +20,15 @@ impl<A: ActorShell> ActorSpawn<A> {
 		join_handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
 	) -> ActorSpawn<A> {
 		ActorSpawn {
-			actor:        Arc::new(shell),
-			_join_handle: join_handle,
+			actor: Arc::new(shell),
+			join_handle,
 		}
 	}
 }
 
 #[doc(hidden)]
 #[async_trait]
-pub trait RoleSender<T: Send>: Sync + Send {
+pub trait RoleSender<T: Send>: Sync + Send + Clone {
 	type Error;
 	async fn send(&self, msg: T) -> Result<(), Self::Error>;
 }
@@ -66,4 +66,5 @@ pub trait Channel {
 pub trait Role: 'static {
 	type Payload: Sized + Send;
 	type Channel: Channel<Item = Self::Payload>;
+	fn clone_sender(&self) -> <Self::Channel as Channel>::Sender;
 }

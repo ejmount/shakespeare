@@ -5,16 +5,16 @@ use crate::data::RoleName;
 
 /// Rewrites the plain method from a role/performance block to have the correct signature for the actor wrapper.
 /// Can be called on either bare signatures or methods, so we can't fill in the body at this point
-pub struct InterfaceRewriter {
-	role_name: RoleName,
+pub struct InterfaceRewriter<'a> {
+	role_name: &'a RoleName,
 }
-impl InterfaceRewriter {
-	pub fn new(role_name: RoleName) -> InterfaceRewriter {
+impl<'a> InterfaceRewriter<'a> {
+	pub fn new(role_name: &RoleName) -> InterfaceRewriter {
 		InterfaceRewriter { role_name }
 	}
 }
 
-impl Fold for InterfaceRewriter {
+impl<'a> Fold for InterfaceRewriter<'a> {
 	fn fold_receiver(&mut self, _: Receiver) -> Receiver {
 		parse_quote! { &self }
 	}
