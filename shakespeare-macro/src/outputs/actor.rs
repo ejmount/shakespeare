@@ -1,5 +1,5 @@
 use quote::ToTokens;
-use syn::{ItemFn, Result};
+use syn::{Item, ItemFn, Result};
 
 use crate::data::DataItem;
 use crate::declarations::actor::ActorDecl;
@@ -18,6 +18,7 @@ pub struct ActorOutput {
 	exit_handler:      Option<ItemFn>,
 	performances:      Vec<PerfDispatch>,
 	roles:             Vec<RoleOutput>,
+	misc:              Vec<Item>,
 }
 
 impl ActorOutput {
@@ -31,6 +32,7 @@ impl ActorOutput {
 			roles,
 			panic_handler,
 			exit_handler,
+			misc,
 			..
 		} = actor_node;
 
@@ -65,6 +67,7 @@ impl ActorOutput {
 			actor_struct,
 			panic_handler,
 			exit_handler,
+			misc,
 		})
 	}
 }
@@ -81,6 +84,9 @@ impl ToTokens for ActorOutput {
 		}
 		for r in &self.roles {
 			r.to_tokens(tokens);
+		}
+		for i in &self.misc {
+			i.to_tokens(tokens);
 		}
 	}
 }

@@ -35,7 +35,7 @@ pub mod Supervisor {
 	}
 
 	fn exit(state: SupervisorState) -> bool {
-		state.success && self.failure
+		state.success && state.failure
 	}
 }
 

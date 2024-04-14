@@ -24,6 +24,7 @@ pub struct ActorDecl {
 	pub exit_handler:  Option<ItemFn>,
 	pub performances:  Vec<PerformanceDecl>,
 	pub roles:         Vec<RoleDecl>,
+	pub misc:          Vec<Item>,
 }
 
 type Fallible<T> = Result<Option<T>, Error>;
@@ -42,6 +43,7 @@ impl ActorDecl {
 		let mut data = vec![];
 		let mut panic_handler = None;
 		let mut exit_handler = None;
+		let mut misc = vec![];
 
 		let Some((_, items)) = &module.content else {
 			return Err(Error::new_spanned(
@@ -51,8 +53,11 @@ impl ActorDecl {
 		};
 
 		for item in items {
+			let mut done = false;
 			for handler in HANDLERS {
-				match handler(item)? {
+				let result = handler(item)?;
+				done |= result.is_some();
+				match result {
 					Some(ActorInternal::CanonPerformance(perf, role)) => {
 						performances.push(perf);
 						roles.push(role);
@@ -66,11 +71,14 @@ impl ActorDecl {
 					}
 					Some(ActorInternal::ExitHandler(f)) => {
 						if let Some(exit_fn) = exit_handler.replace(f) {
-                            return Err(Error::new_spanned(exit_fn, "Duplicate exit handler"));
-                        }
+							return Err(Error::new_spanned(exit_fn, "Duplicate exit handler"));
+						}
 					}
 					None => continue,
 				}
+			}
+			if !done {
+				misc.push(item.clone());
 			}
 		}
 
@@ -103,6 +111,7 @@ impl ActorDecl {
 			exit_handler,
 			performances,
 			roles,
+			misc,
 		})
 	}
 }
