@@ -1,7 +1,5 @@
 use itertools::Itertools;
-use syn::{
-	parse_quote, Attribute, Error, ImplItem, Item, ItemFn, ItemImpl, ItemMod, Path, Visibility,
-};
+use syn::{parse_quote, Attribute, Error, ImplItem, Item, ItemFn, ItemImpl, ItemMod, Visibility};
 
 use crate::data::{ActorName, DataItem};
 use crate::declarations::performance::PerformanceAttribute;
@@ -99,7 +97,7 @@ impl ActorDecl {
 		};
 
 		let actor_name = &module.ident;
-		let actor_name: Path = fallible_quote! { #actor_name }?;
+		let actor_name = ActorName(fallible_quote! { #actor_name }?);
 
 		assert!(!performances.is_empty(), "Empty perfs"); // Because [SpawningFunction] falls over otherwise
 

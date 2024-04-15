@@ -3,7 +3,7 @@ use quote::{quote, ToTokens};
 use syn::parse::Parser;
 use syn::{Field, ImplItemFn, ItemFn, ItemImpl, ItemStruct, Path, Result, Visibility};
 
-use crate::data::RoleName;
+use crate::data::{ActorName, RoleName};
 use crate::declarations::actor::ActorDecl;
 use crate::declarations::performance::PerformanceDecl;
 use crate::macros::{fallible_quote, map_or_bail};
@@ -63,7 +63,7 @@ impl ToTokens for ActorStruct {
 fn create_meta_trait_impl(
 	panic_handler: &Option<ItemFn>,
 	exit_handler: &Option<ItemFn>,
-	actor_name: &Path,
+	actor_name: &ActorName,
 ) -> Result<ItemImpl> {
 	let unit_type = fallible_quote!(()).unwrap();
 	let panic_type =
@@ -93,7 +93,7 @@ fn create_meta_trait_impl(
 fn create_inherent_impl(
 	role_names: &Vec<&RoleName>,
 	actor_vis: &Visibility,
-	actor_name: &Path,
+	actor_name: &ActorName,
 ) -> Result<ItemImpl> {
 	fn accessor_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
 		let error_path: Path = fallible_quote! { shakespeare::Role2SendError<dyn #role_name> }?;
