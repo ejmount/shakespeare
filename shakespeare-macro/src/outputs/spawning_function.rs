@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use itertools::{izip, Itertools};
 use proc_macro2::TokenStream;
 use quote::{format_ident, ToTokens};
 use syn::parse::Parser;
@@ -38,29 +38,31 @@ impl SpawningFunction {
 			.collect_vec();
 
 		let queue_constructions = map_or_bail!(
-			itertools::izip!(performances, &input_field_names, &output_field_names),
+			izip!(performances, &input_field_names, &output_field_names),
 			|(role, inn, out)| -> Result<Stmt> {
 				let role_name = &role.role_name;
-				fallible_quote! { let (#inn, mut #out) = <dyn #role_name as shakespeare::Role>::Channel::new_default(); }
+				fallible_quote! { let (#inn, mut #out) = <dyn #role_name as ::shakespeare::Role>::Channel::new_default(); }
 			}
 		);
 
-		let actor_fields = map_or_bail!(
-			itertools::izip!(performances, &input_field_names),
-			|(role, input)| -> Result<Field> {
-				let field_name = role.role_name.queue_name();
-				Field::parse_named.parse2(fallible_quote! {#field_name : #input}?)
-			}
-		);
+		let actor_fields =
+			map_or_bail!(
+				izip!(performances, &input_field_names),
+				|(role, input)| -> Result<Field> {
+					let field_name = role.role_name.queue_name();
+					Field::parse_named.parse2(fallible_quote! {#field_name : #input}?)
+				}
+			);
 
 		assert!(!performances.is_empty());
 		assert!(!output_field_names.is_empty());
 
 		let select_branches = map_or_bail!(
-			itertools::izip!(performances, &output_field_names),
+			izip!(performances, &output_field_names),
 			|(role, output)| -> Result<TokenStream> {
 				let fn_name = role.role_name.method_name();
-				fallible_quote! { Some(msg) = #output.recv() => {
+				fallible_quote! { Some(msg) = #output.recv(), if !(#output.is_empty() && outstanding_clients == 1) => {
+					timeout_sleep.as_mut().reset(Instant::now() + IDLE_TIMEOUT);
 					state.#fn_name(msg).await
 				} }
 			}
@@ -81,12 +83,21 @@ impl SpawningFunction {
 			.map(|p| fallible_quote! { let result = result.map(|_| #p(state)); })
 			.transpose()?;
 
+		let getter_name = actor_name.get_static_item_name();
+
 		let fun: ItemImpl = fallible_quote! {
 			impl #data_name {
 				pub fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
-					use shakespeare::{ActorSpawn, Channel, catch_future};
+					use ::shakespeare::{ActorSpawn, Channel, RoleReceiver, catch_future};
+					use ::std::sync::Arc;
+					use ::tokio::{select, pin};
+					use ::tokio::time::{sleep, Duration, Instant};
+
+					const IDLE_TIMEOUT: Duration = Duration::from_millis(50);
+
 					#(#queue_constructions)*
-					let actor = #constructor;
+					let actor = Arc::new(#constructor);
+					let stored_actor = Arc::clone(&actor);
 
 					let event_loop = async move {
 						// SAFETY: The receive handles inside the branches are not safe to unwind
@@ -95,16 +106,31 @@ impl SpawningFunction {
 						// If we assume that a panic will not happen **during** an operation on the receiver,
 						// then the control block will still be consistent at any point the sender looks at it
 						// even if the receiver was destroyed
-						let result = catch_future(async {
-							loop {
-								::tokio::select! {
-									#(#select_branches),*
-									else => { break; }
+						let guarded_future = catch_future(
+							#getter_name.scope(stored_actor, async {
+								let timeout_sleep = sleep(IDLE_TIMEOUT);
+								pin!(timeout_sleep);
+								loop {
+									let outstanding_clients = #getter_name.with(Arc::strong_count);
+									select! {
+										#(#select_branches),*
+										_ = &mut timeout_sleep, if outstanding_clients > 1 => {
+											if outstanding_clients == 1 {
+												break;
+											}
+											else {
+												timeout_sleep.as_mut().reset(Instant::now() + IDLE_TIMEOUT)
+											}
+										},
+										else => { break; }
+									};
 								}
+							})
+						);
 
-							}
-						})
-						.await;
+
+						let result = guarded_future.await;
+
 						#run_panic_handler
 						#run_exit_handler
 						result

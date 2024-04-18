@@ -18,6 +18,10 @@ impl<T: Send> RoleReceiver<T> for UnboundedReceiver<T> {
 	async fn recv(&mut self) -> Option<T> {
 		self.recv().await
 	}
+
+	fn is_empty(&self) -> bool {
+		self.is_empty()
+	}
 }
 
 #[doc(hidden)]

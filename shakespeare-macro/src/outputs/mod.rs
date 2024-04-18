@@ -4,4 +4,5 @@ pub mod actor_struct;
 pub mod dispatch_core_fn;
 pub mod perfdispatch;
 pub mod role;
+pub mod self_getter;
 pub mod spawning_function;

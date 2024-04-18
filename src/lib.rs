@@ -9,14 +9,15 @@
 //#![warn(unused_crate_dependencies)]
 #![forbid(unsafe_code)]
 #![forbid(clippy::todo)]
-//#![forbid(clippy::unimplemented)]
+#![forbid(clippy::unimplemented)]
 
 use std::any::Any;
 use std::future::Future;
+use std::sync::Arc;
 
 #[doc(hidden)]
 pub use ::tokio as tokio_export;
-use futures::{stream, Stream};
+use futures::{Stream, StreamExt};
 pub use shakespeare_macro::{actor, performance, role};
 #[doc(hidden)]
 pub use tokio::TokioUnbounded;
@@ -43,29 +44,29 @@ where
 	futures::future::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(fut))
 }
 
-pub fn add_stream<R, S>(actor: &R, stream: S)
+pub fn add_stream<R, S>(actor: Arc<R>, stream: S)
 where
 	R: Role + ?Sized,
 	S: Stream<Item: Send + 'static> + Send + 'static,
 	R::Payload: From<S::Item>,
 {
-	use futures::StreamExt;
-	let sender = actor.clone_sender();
-	crate::tokio_export::spawn(async move {
-		let sender = sender;
+	tokio_export::spawn(async move {
 		stream
 			.for_each(|msg| async {
-				let _ = sender.send(msg.into()).await;
+				let _ = actor.clone_sender().send(msg.into()).await;
 			})
 			.await;
 	});
 }
 
-pub fn add_future<R, F>(actor: &R, fut: F)
+pub fn add_future<R, F>(actor: Arc<R>, fut: F)
 where
 	R: Role + ?Sized,
 	F: Future<Output: Send + 'static> + Send + 'static,
 	R::Payload: From<F::Output>,
 {
-	add_stream(actor, stream::once(fut));
+	tokio_export::spawn(async move {
+		let actor = actor;
+		let _ = actor.clone_sender().send(fut.await.into()).await;
+	});
 }

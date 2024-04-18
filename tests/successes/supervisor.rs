@@ -1,7 +1,7 @@
-use std::sync::Arc;
 use std::time::Duration;
 
 use shakespeare::{actor, add_future, ActorSpawn};
+use w::Work;
 
 #[actor]
 pub mod Supervisor {
@@ -10,63 +10,97 @@ pub mod Supervisor {
 	pub struct SupervisorState {
 		success: bool,
 		failure: bool,
+		idle:    bool,
 	}
 
 	#[performance(canonical)]
 	impl Starter for SupervisorState {
-		fn go(&mut self, listener: Arc<dyn Listening>) {
-			let ActorSpawn { join_handle, .. } = WorkerState::start(WorkerState { success: true });
-			add_future(&*listener, join_handle);
-			let ActorSpawn { join_handle, .. } = WorkerState::start(WorkerState { success: false });
-			add_future(&*listener, join_handle);
+		fn go(&mut self) {
+			let ActorSpawn {
+				actor, join_handle, ..
+			} = w::WorkerState::start(w::WorkerState {
+				success: true,
+				count:   0,
+			});
+			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
+			actor.work().await.unwrap();
+
+			let ActorSpawn {
+				actor, join_handle, ..
+			} = w::WorkerState::start(w::WorkerState {
+				success: false,
+				count:   0,
+			});
+			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
+			actor.work().await.unwrap();
+
+			let ActorSpawn {
+				actor, join_handle, ..
+			} = w::WorkerState::start(w::WorkerState {
+				success: true,
+				count:   0,
+			});
+			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
+			tokio::time::sleep(Duration::from_millis(500)).await;
+			drop(actor);
 		}
 	}
 
 	#[performance(canonical)]
 	impl Listening for SupervisorState {
-		fn leave(&mut self, val: Result<Result<(), ()>, tokio::task::JoinError>) {
+		fn leave(&mut self, val: Result<Result<bool, ()>, tokio::task::JoinError>) {
 			let Ok(result) = val else { unreachable!() };
-			if result.is_ok() {
-				self.success = true;
-			} else {
-				self.failure = true;
+			match result {
+				Ok(true) => self.success = true,
+				Ok(false) => self.idle = true,
+				Err(_) => {
+					self.failure = true;
+				}
 			}
 		}
 	}
 
-	fn exit(state: SupervisorState) -> bool {
-		state.success && state.failure
+	fn stop(state: SupervisorState) -> bool {
+		state.success && state.failure && state.idle
 	}
 }
+mod w {
+	use super::*;
+	#[actor]
+	pub mod Worker {
 
-#[actor]
-pub mod Worker {
-	pub struct WorkerState {
-		success: bool,
-	}
-	#[performance(canonical)]
-	impl Work for WorkerState {
-		async fn work(&mut self, thing: Arc<dyn Sleeper>) {
-			let sleep = tokio::time::sleep(Duration::from_millis(50));
-			add_future(&*thing, sleep);
+		pub struct WorkerState {
+			pub success: bool,
+			pub count:   usize,
 		}
-	}
-	#[performance(canonical)]
-	impl Sleeper for WorkerState {
-		fn wake(&mut self, _wake: ()) {
-			if self.success {
-				return;
-			} else {
-				panic!()
+		#[performance(canonical)]
+		impl Work for WorkerState {
+			async fn work(&mut self) {
+				self.count += 1;
+				let sleep = tokio::time::sleep(Duration::from_millis(50));
+				add_future::<dyn Sleeper, _>(Self::get_shell(), sleep);
 			}
 		}
-	}
+		#[performance(canonical)]
+		impl Sleeper for WorkerState {
+			fn wake(&mut self, _wake: ()) {
+				if self.success {
+					return;
+				} else {
+					panic!()
+				}
+			}
+		}
 
-	fn catch(_val: Box<dyn std::any::Any + std::marker::Send>) {
-		// throw away the panic value
+		fn stop(ws: WorkerState) -> bool {
+			ws.count > 0
+		}
+
+		fn catch(_val: Box<dyn std::any::Any + std::marker::Send>) {
+			// throw away the panic value
+		}
 	}
 }
-
 #[tokio::test]
 async fn main() {
 	let ActorSpawn {
@@ -75,8 +109,8 @@ async fn main() {
 		..
 	} = SupervisorState::start(SupervisorState::default());
 
-	let _ = shell.go(shell.clone()).await;
+	let _ = shell.go().await;
 	drop(shell);
 
-	assert!(join_handle.await.unwrap().is_ok());
+	assert!(join_handle.await.unwrap().unwrap());
 }

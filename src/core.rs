@@ -16,13 +16,10 @@ where
 impl<A: ActorShell> ActorSpawn<A> {
 	#[doc(hidden)]
 	pub fn new(
-		shell: A,
+		actor: Arc<A>,
 		join_handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
 	) -> ActorSpawn<A> {
-		ActorSpawn {
-			actor: Arc::new(shell),
-			join_handle,
-		}
+		ActorSpawn { actor, join_handle }
 	}
 }
 
@@ -37,6 +34,7 @@ pub trait RoleSender<T: Send>: Sync + Send + Clone {
 #[async_trait]
 pub trait RoleReceiver<T: Send> {
 	async fn recv(&mut self) -> Option<T>;
+	fn is_empty(&self) -> bool;
 }
 
 #[doc(hidden)]
@@ -63,7 +61,7 @@ pub trait Channel {
 }
 
 #[doc(hidden)]
-pub trait Role: 'static {
+pub trait Role: 'static + Sync + Send {
 	type Payload: Sized + Send;
 	type Channel: Channel<Item = Self::Payload>;
 	fn clone_sender(&self) -> <Self::Channel as Channel>::Sender;

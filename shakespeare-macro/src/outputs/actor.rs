@@ -7,12 +7,14 @@ use crate::macros::map_or_bail;
 use crate::outputs::actor_struct::ActorStruct;
 use crate::outputs::perfdispatch::PerfDispatch;
 use crate::outputs::role::RoleOutput;
+use crate::outputs::self_getter::SelfGetter;
 use crate::outputs::spawning_function::SpawningFunction;
 
 #[derive(Debug)]
 pub struct ActorOutput {
 	data_item:         DataItem,
 	actor_struct:      ActorStruct,
+	getter:            SelfGetter,
 	spawning_function: SpawningFunction,
 	panic_handler:     Option<ItemFn>,
 	exit_handler:      Option<ItemFn>,
@@ -40,6 +42,8 @@ impl ActorOutput {
 		let panic_name = panic_handler.as_ref().map(|i| i.sig.ident.clone());
 		let exit_name = exit_handler.as_ref().map(|i| i.sig.ident.clone());
 
+		let getter = SelfGetter::new(&actor_name, &data_name)?;
+
 		assert!(!performances.is_empty());
 		let sf = SpawningFunction::new(
 			&actor_name,
@@ -62,6 +66,7 @@ impl ActorOutput {
 		Ok(ActorOutput {
 			data_item,
 			performances,
+			getter,
 			spawning_function: sf,
 			roles,
 			actor_struct,
@@ -76,6 +81,7 @@ impl ToTokens for ActorOutput {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.actor_struct.to_tokens(tokens);
 		self.data_item.to_tokens(tokens);
+		self.getter.to_tokens(tokens);
 		self.spawning_function.to_tokens(tokens);
 		self.panic_handler.to_tokens(tokens);
 		self.exit_handler.to_tokens(tokens);
