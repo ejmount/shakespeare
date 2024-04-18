@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use shakespeare::{actor, add_future, ActorSpawn};
-use w::Work;
 
 #[actor]
 pub mod Supervisor {
@@ -18,7 +17,7 @@ pub mod Supervisor {
 		fn go(&mut self) {
 			let ActorSpawn {
 				actor, join_handle, ..
-			} = w::WorkerState::start(w::WorkerState {
+			} = WorkerState::start(WorkerState {
 				success: true,
 				count:   0,
 			});
@@ -27,7 +26,7 @@ pub mod Supervisor {
 
 			let ActorSpawn {
 				actor, join_handle, ..
-			} = w::WorkerState::start(w::WorkerState {
+			} = WorkerState::start(WorkerState {
 				success: false,
 				count:   0,
 			});
@@ -36,7 +35,7 @@ pub mod Supervisor {
 
 			let ActorSpawn {
 				actor, join_handle, ..
-			} = w::WorkerState::start(w::WorkerState {
+			} = WorkerState::start(WorkerState {
 				success: true,
 				count:   0,
 			});
@@ -64,43 +63,42 @@ pub mod Supervisor {
 		state.success && state.failure && state.idle
 	}
 }
-mod w {
-	use super::*;
-	#[actor]
-	pub mod Worker {
 
-		pub struct WorkerState {
-			pub success: bool,
-			pub count:   usize,
-		}
-		#[performance(canonical)]
-		impl Work for WorkerState {
-			async fn work(&mut self) {
-				self.count += 1;
-				let sleep = tokio::time::sleep(Duration::from_millis(50));
-				add_future::<dyn Sleeper, _>(Self::get_shell(), sleep);
-			}
-		}
-		#[performance(canonical)]
-		impl Sleeper for WorkerState {
-			fn wake(&mut self, _wake: ()) {
-				if self.success {
-					return;
-				} else {
-					panic!()
-				}
-			}
-		}
+#[actor]
+pub mod Worker {
 
-		fn stop(ws: WorkerState) -> bool {
-			ws.count > 0
-		}
-
-		fn catch(_val: Box<dyn std::any::Any + std::marker::Send>) {
-			// throw away the panic value
+	pub struct WorkerState {
+		pub success: bool,
+		pub count:   usize,
+	}
+	#[performance(canonical)]
+	impl Work for WorkerState {
+		async fn work(&mut self) {
+			self.count += 1;
+			let sleep = tokio::time::sleep(Duration::from_millis(50));
+			add_future::<dyn Sleeper, _>(Self::get_shell(), sleep);
 		}
 	}
+	#[performance(canonical)]
+	impl Sleeper for WorkerState {
+		fn wake(&mut self, _wake: ()) {
+			if self.success {
+				return;
+			} else {
+				panic!()
+			}
+		}
+	}
+
+	fn stop(ws: WorkerState) -> bool {
+		ws.count > 0
+	}
+
+	fn catch(_val: Box<dyn std::any::Any + std::marker::Send>) {
+		// throw away the panic value
+	}
 }
+
 #[tokio::test]
 async fn main() {
 	let ActorSpawn {

@@ -1,4 +1,6 @@
+use convert_case::{Case, Casing};
 use itertools::Itertools;
+use quote::format_ident;
 use syn::{parse_quote, Attribute, Error, ImplItem, Item, ItemFn, ItemImpl, ItemMod, Visibility};
 
 use crate::data::{ActorName, DataItem};
@@ -96,8 +98,18 @@ impl ActorDecl {
 			}
 		};
 
-		let actor_name = &module.ident;
-		let actor_name = ActorName(fallible_quote! { #actor_name }?);
+		let actor_ident = &module.ident;
+		let actor_name = ActorName(fallible_quote! { #actor_ident }?);
+
+		// Replace this with an impl block so we don't have to disambigate
+		if let Some(handler) = panic_handler.as_mut() {
+			let s = format!("{}_{}", actor_ident, handler.sig.ident);
+			handler.sig.ident = format_ident!("{}", s.to_case(Case::Snake));
+		}
+		if let Some(handler) = exit_handler.as_mut() {
+			let s = format!("{}_{}", actor_ident, handler.sig.ident);
+			handler.sig.ident = format_ident!("{}", s.to_case(Case::Snake));
+		}
 
 		assert!(!performances.is_empty(), "Empty perfs"); // Because [SpawningFunction] falls over otherwise
 
