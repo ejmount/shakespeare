@@ -47,8 +47,9 @@ where
 pub fn add_stream<R, S>(actor: Arc<R>, stream: S)
 where
 	R: Role + ?Sized,
-	S: Stream<Item: Send + 'static> + Send + 'static,
+	S: Stream + Send + 'static,
 	R::Payload: From<S::Item>,
+	<S as Stream>::Item: Send,
 {
 	tokio_export::spawn(async move {
 		stream
@@ -62,7 +63,7 @@ where
 pub fn add_future<R, F>(actor: Arc<R>, fut: F)
 where
 	R: Role + ?Sized,
-	F: Future<Output: Send + 'static> + Send + 'static,
+	F: Future + Send + 'static,
 	R::Payload: From<F::Output>,
 {
 	tokio_export::spawn(async move {

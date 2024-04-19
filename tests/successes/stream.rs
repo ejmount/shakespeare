@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::sync::Arc;
 
 use shakespeare::{actor, add_stream, ActorSpawn};
@@ -18,6 +19,7 @@ pub mod Counter {
 	fn stop(state: ActorState) -> usize {
 		state.count
 	}
+	fn catch(_: Box<dyn Any + Send>) {}
 }
 
 #[tokio::test]
@@ -26,15 +28,10 @@ async fn main() {
 		actor, join_handle, ..
 	} = ActorState::start(ActorState::default());
 
-	let counting: Arc<dyn Counting + 'static> = actor;
+	let counting: Arc<dyn Counting> = actor;
 
 	let numbers = futures::stream::iter(0..10);
 	add_stream(counting, numbers);
-	// Force the actor to exit when the stream stops
 
-	let Ok(Ok(answer)) = join_handle.await else {
-		unreachable!()
-	};
-
-	assert_eq!(answer, 45);
+	assert!(join_handle.await.unwrap() == Ok(45));
 }
