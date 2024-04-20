@@ -25,7 +25,9 @@ pub use tokio::TokioUnbounded;
 mod core;
 mod tokio;
 
-pub use core::{ActorShell, ActorSpawn, Channel, Role, RoleReceiver, RoleSender};
+pub use core::{
+	ActorHandle, ActorOutcome, ActorShell, ActorSpawn, Channel, Role, RoleReceiver, RoleSender,
+};
 
 #[doc(hidden)]
 pub type Role2Payload<R> = <R as Role>::Payload;

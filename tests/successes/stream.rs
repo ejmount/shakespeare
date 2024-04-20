@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::sync::Arc;
 
-use shakespeare::{actor, add_stream, ActorSpawn};
+use shakespeare::{actor, add_stream, ActorOutcome, ActorSpawn};
 
 #[actor]
 pub mod Counter {
@@ -24,14 +24,12 @@ pub mod Counter {
 
 #[tokio::test]
 async fn main() {
-	let ActorSpawn {
-		actor, join_handle, ..
-	} = ActorState::start(ActorState::default());
+	let ActorSpawn { actor, handle, .. } = ActorState::start(ActorState::default());
 
 	let counting: Arc<dyn Counting> = actor;
 
 	let numbers = futures::stream::iter(0..10);
 	add_stream(counting, numbers);
 
-	assert!(join_handle.await.unwrap() == Ok(45));
+	assert!(handle.await == ActorOutcome::Exit(45));
 }
