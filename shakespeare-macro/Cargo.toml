@@ -19,4 +19,4 @@ syn = { version = "2.0.48", features = ["full", "fold", "extra-traits"] }
 
 convert_case = "0.6.0"
 itertools = "0.12.0"
-structmeta = "0.2.0"
+structmeta = "0.3.0"
