@@ -1,12 +1,20 @@
 # Shakespeare
 
+![Version](https://img.shields.io/crates/v/shakespeare)
+![Build](https://github.com/ejmount/shakespeare/actions/workflows/rust.yml/badge.svg)
+![release date](https://img.shields.io/github/release-date/ejmount/shakespeare)
+[![codecov](https://codecov.io/gh/ejmount/shakespeare/branch/main/graph/badge.svg?token=2L6ZS8OK32)](https://codecov.io/gh/ejmount/shakespeare)
+![Licence](https://img.shields.io/github/license/ejmount/shakespeare)
+![Downloads](https://img.shields.io/crates/d/shakespeare)
+
 Shakespeare is an actor framework written in Rust that focuses on ergonomics and extensibility while maintaining high performance.
 
-Its most significant differences from existing frameworks include:
+Its most significant features include:
 
-* __polymorphic actors__ - actors' interfaces are a first-class consideration in shakespeare, and allowing code to work over dynamically chosen actors is a primary use case
-* __rich interfaces__ - a single interface for an actor can support any number of methods with no more boilerplate than the equivalent trait definition
-* __code generation__ - the majority of functionality is implemented by procedural macros, both minimizing direct runtime overhead and offering more visibility to the optimizer.
+* __Polymorphic actors__ - actors' interfaces are a first-class consideration in shakespeare, and allowing code to work over dynamically chosen actors is a primary use case.
+* __Rich interfaces__ - a single interface for an actor can support any number of methods with no more boilerplate than the equivalent trait definition.
+* __Static validation__ - the majority of functionality is implemented by procedural macros, minimizing direct runtime overhead and offering more visibility to the optimizer without sacrificing static type checking at any point.
+* __Interoperability__ - linking actors into the wider ecosystem of async code is designed to be easy.
 
 ## Example
 
