@@ -14,7 +14,7 @@ keywords = ["async", "macro", "futures"]
 members = ["shakespeare-macro"]
 
 [workspace.package]
-version = "0.0.0"
+version = "0.0.1"
 authors = ["Ewan Mount"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ejmount/shakespeare"
@@ -24,7 +24,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.80"
 tokio = { version = "1.37.0", features = ["macros", "full"] }
-shakespeare-macro = { path = "shakespeare-macro", version = "=0.0.0" }
+shakespeare-macro = { path = "shakespeare-macro", version = "=0.0.1" }
 futures = "0.3.30"
 
 
