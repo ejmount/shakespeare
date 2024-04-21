@@ -1,8 +1,8 @@
 # Shakespeare
 
-![Version](https://img.shields.io/crates/v/shakespeare)
 ![Build](https://github.com/ejmount/shakespeare/actions/workflows/rust.yml/badge.svg)
-![release date](https://img.shields.io/github/release-date/ejmount/shakespeare)
+![Version](https://img.shields.io/crates/v/shakespeare)
+![release date](https://img.shields.io/github/v/release/ejmount/shakespeare)
 [![codecov](https://codecov.io/gh/ejmount/shakespeare/branch/main/graph/badge.svg?token=2L6ZS8OK32)](https://codecov.io/gh/ejmount/shakespeare)
 ![Licence](https://img.shields.io/github/license/ejmount/shakespeare)
 ![Downloads](https://img.shields.io/crates/d/shakespeare)

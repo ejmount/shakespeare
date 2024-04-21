@@ -87,11 +87,11 @@ jobs:
           command: xtask
           args: coverage
 
-
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
         with:
-          files: coverage/*.lcov
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ejmount/shakespeare
 
   lints:
     name: Lints
