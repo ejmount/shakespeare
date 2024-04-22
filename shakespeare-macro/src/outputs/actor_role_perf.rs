@@ -79,7 +79,6 @@ fn create_sending_method(
 			use shakespeare::{RoleReceiver, RoleSender};
 			let msg = (#(#params),*);
 			let payload = #payload_type::#variant_name(msg);
-			//let field: &dyn shakespeare::RoleSender::<#payload_type, Error = _> = &self.#data_field_name;
 			let _ = self.#accessor(payload).await;
 			Ok(())
 		}
