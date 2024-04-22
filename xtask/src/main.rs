@@ -120,6 +120,6 @@ fn root_crate_dir() -> PathBuf {
 }
 
 /// Prompt the user to confirm an action
-fn confirm(question: &str) -> Result<bool, std::io::Error> {
+fn confirm(question: &str) -> Result<bool, dialoguer::Error> {
 	Confirm::new().with_prompt(question).interact()
 }
