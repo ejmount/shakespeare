@@ -113,7 +113,6 @@ pub trait RoleReceiver<T: Send> {
 	fn is_empty(&self) -> bool;
 }
 
-#[doc(hidden)]
 pub trait ActorShell {
 	type ExitType;
 	type PanicType;
@@ -136,7 +135,6 @@ pub trait Channel {
 	}
 }
 
-#[doc(hidden)]
 pub trait Role: 'static + Sync + Send {
 	type Payload: Sized + Send;
 	type Channel: Channel<Item = Self::Payload>;

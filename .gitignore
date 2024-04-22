@@ -11,3 +11,6 @@ Cargo.lock
 
 # Coverage results
 /coverage
+
+# Personal config
+/.vscode
