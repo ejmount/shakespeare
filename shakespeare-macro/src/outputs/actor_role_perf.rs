@@ -11,7 +11,7 @@ use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
 #[derive(Debug)]
 pub struct ActorPerf {
-	imp: Option<ItemImpl>,
+	imp: ItemImpl,
 }
 
 impl ActorPerf {
@@ -42,15 +42,15 @@ impl ActorPerf {
 			}
 		}?;
 
-		let output = (!sending_methods.is_empty()).then_some(fallible_quote! {
+		let imp = fallible_quote! {
 			#[::async_trait::async_trait]
 			impl #role_name for #actor_path {
 				#(#sending_methods)*
 				#sender_get
 			}
-		}?);
+		}?;
 
-		Ok(ActorPerf { imp: output })
+		Ok(ActorPerf { imp })
 	}
 }
 
