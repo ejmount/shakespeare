@@ -78,6 +78,11 @@ impl<A: ActorShell> Future for ActorHandle<A> {
 	}
 }
 
+pub trait ActorShell {
+	type ExitType;
+	type PanicType;
+}
+
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct ActorSpawn<A>
@@ -94,8 +99,10 @@ impl<A: ActorShell> ActorSpawn<A> {
 		actor: Arc<A>,
 		handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
 	) -> ActorSpawn<A> {
-		let handle = ActorHandle::new(handle);
-		ActorSpawn { actor, handle }
+		ActorSpawn {
+			actor,
+			handle: ActorHandle::new(handle),
+		}
 	}
 }
 
@@ -111,11 +118,6 @@ pub trait RoleSender<T: Send>: Sync + Send + Clone {
 pub trait RoleReceiver<T: Send> {
 	async fn recv(&mut self) -> Option<T>;
 	fn is_empty(&self) -> bool;
-}
-
-pub trait ActorShell {
-	type ExitType;
-	type PanicType;
 }
 
 #[doc(hidden)]
