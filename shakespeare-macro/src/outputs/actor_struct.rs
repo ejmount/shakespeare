@@ -10,9 +10,9 @@ use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
 pub struct ActorStruct {
-	strukt:        ItemStruct,
-	accessor_impl: ItemImpl,
-	meta_trait:    ItemImpl,
+	strukt:                  ItemStruct,
+	sender_method_name_impl: ItemImpl,
+	meta_trait:              ItemImpl,
 }
 
 impl ActorStruct {
@@ -40,13 +40,13 @@ impl ActorStruct {
 			.map(PerformanceDecl::get_role_name)
 			.collect_vec();
 
-		let accessor_impl = create_inherent_impl(&role_names, actor_vis, actor_name)?;
+		let sender_method_name_impl = create_inherent_impl(&role_names, actor_vis, actor_name)?;
 
 		let meta_trait = create_meta_trait_impl(panic_handler, exit_handler, actor_name)?;
 
 		Ok(ActorStruct {
 			strukt,
-			accessor_impl,
+			sender_method_name_impl,
 			meta_trait,
 		})
 	}
@@ -56,7 +56,7 @@ impl ToTokens for ActorStruct {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.strukt.to_tokens(tokens);
 		self.meta_trait.to_tokens(tokens);
-		self.accessor_impl.to_tokens(tokens);
+		self.sender_method_name_impl.to_tokens(tokens);
 	}
 }
 
@@ -95,12 +95,12 @@ fn create_inherent_impl(
 	actor_vis: &Visibility,
 	actor_name: &ActorName,
 ) -> Result<ItemImpl> {
-	fn accessor_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
+	fn sender_method_name_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
 		let error_path: Path = fallible_quote! { shakespeare::Role2SendError<dyn #role_name> }?;
 		let payload_path = role_name.payload_path();
 		let field_name = role_name.queue_name();
 
-		let acccessor_name = role_name.acccessor_name();
+		let acccessor_name = role_name.sender_method_name();
 
 		fallible_quote! {
 			#vis async fn #acccessor_name(&self, payload: #payload_path) -> Result<(), #error_path>
@@ -121,11 +121,13 @@ fn create_inherent_impl(
 		}
 	}
 
-	let accessors = map_or_bail!(&role_names, |name| accessor_from_name(name, actor_vis));
+	let sender_method_names = map_or_bail!(&role_names, |name| sender_method_name_from_name(
+		name, actor_vis
+	));
 	let getters = map_or_bail!(&role_names, |name| sender_getter_from_name(name, actor_vis));
 	fallible_quote! {
 		impl #actor_name {
-			#(#accessors)*
+			#(#sender_method_names)*
 			#(#getters)*
 		}
 	}

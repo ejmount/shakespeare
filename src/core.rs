@@ -141,5 +141,5 @@ pub trait Channel {
 pub trait Role: 'static + Sync + Send {
 	type Payload: Sized + Send;
 	type Channel: Channel<Item = Self::Payload>;
-	fn clone_sender(&self) -> <Self::Channel as Channel>::Sender;
+	async fn send(&self, val: Self::Payload);
 }

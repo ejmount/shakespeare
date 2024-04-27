@@ -36,7 +36,7 @@ impl RoleOutput {
 		let signatures = signatures.into_iter().map(|s| rewriter.fold_signature(s));
 
 		let get_sender: TraitItem = fallible_quote! {
-			fn get_sender<'a>(&'a self) -> &'a ::shakespeare::Role2Sender<dyn #role_name>;
+			async fn send(&self, val: #payload_type);
 		}?;
 
 		let trait_definition = fallible_quote! {
@@ -51,8 +51,8 @@ impl RoleOutput {
 			impl ::shakespeare::Role for dyn #role_name {
 				type Payload = #payload_type;
 				type Channel = ::shakespeare::TokioUnbounded<Self::Payload>;
-				fn clone_sender(&self) -> ::shakespeare::Role2Sender<dyn #role_name> {
-					self.get_sender().clone()
+				async fn send(&self, val: #payload_type) {
+					self.send(val).await;
 				}
 			}
 		}?;
