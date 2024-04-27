@@ -8,7 +8,7 @@ mod Actor {
 		sender: UnboundedSender<usize>,
 	}
 	#[shakespeare::performance(canonical)]
-	impl Role for ActorState {
+	impl BasicRole for ActorState {
 		fn speak(&mut self, val: usize) {
 			self.sender.send(val).unwrap();
 		}
