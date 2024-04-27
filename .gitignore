@@ -17,4 +17,4 @@ Cargo.lock
 
 # xtask temporaries
 /xtask/src/stripped_macro/
-/expanded/
+/xtask/tests/expanded/

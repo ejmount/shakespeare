@@ -15,6 +15,7 @@ mod expander;
 #[path = "stripped_macro/lib.rs"]
 #[allow(clippy::all)]
 #[allow(clippy::pedantic)]
+#[allow(warnings)]
 mod stripped_macro;
 
 #[derive(Parser)]
