@@ -107,14 +107,14 @@ impl<A: ActorShell> ActorSpawn<A> {
 }
 
 #[doc(hidden)]
-#[async_trait]
+#[trait_variant::make(Send)]
 pub trait RoleSender<T: Send>: Sync + Send + Clone {
 	type Error;
 	async fn send(&self, msg: T) -> Result<(), Self::Error>;
 }
 
 #[doc(hidden)]
-#[async_trait]
+#[trait_variant::make(Send)]
 pub trait RoleReceiver<T: Send> {
 	async fn recv(&mut self) -> Option<T>;
 	fn is_empty(&self) -> bool;
@@ -137,6 +137,7 @@ pub trait Channel {
 	}
 }
 
+#[trait_variant::make(Send)]
 pub trait Role: 'static + Sync + Send {
 	type Payload: Sized + Send;
 	type Channel: Channel<Item = Self::Payload>;

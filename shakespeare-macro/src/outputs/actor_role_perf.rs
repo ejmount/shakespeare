@@ -43,7 +43,7 @@ impl ActorPerf {
 		}?;
 
 		let imp = fallible_quote! {
-			#[::async_trait::async_trait]
+			#[::async_trait::async_trait] // Can't be removed because it makes the trait not obj-safe
 			impl #role_name for #actor_path {
 				#(#sending_methods)*
 				#sender_get
