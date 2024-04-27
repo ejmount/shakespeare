@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::env::set_current_dir;
 use std::path::{Path, PathBuf};
 
@@ -8,6 +10,12 @@ use dialoguer::Confirm;
 use duct::cmd;
 use fs_extra::dir::{create_all, get_dir_content};
 use fs_extra::file::remove;
+
+mod expander;
+#[path = "stripped_macro/lib.rs"]
+#[allow(clippy::all)]
+#[allow(clippy::pedantic)]
+mod stripped_macro;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -29,6 +37,7 @@ enum Commands {
 		#[arg(short, long)]
 		open_report: Option<bool>,
 	},
+	Expand,
 }
 
 fn main() -> Result<(), Error> {
@@ -39,6 +48,7 @@ fn main() -> Result<(), Error> {
 			readable,
 			open_report,
 		} => coverage(readable, open_report),
+		Commands::Expand => expander::expand_all_tests(),
 	}
 }
 
@@ -89,12 +99,11 @@ fn coverage(readable: bool, open_report: Option<bool>) -> Result<(), Error> {
 
 		if open_report.map_or_else(|| confirm("open report folder?"), Result::Ok)? {
 			match open::that(&index_file) {
-				Ok(_) => {
-					println!("{}", "Opened".color(Color::Green))
+				Ok(()) => {
+					println!("{}", "Opened".color(Color::Green));
 				}
 				Err(e) => {
 					eprintln!("{e}\n{} to open reports", "Failure".color(Color::Red));
-					Err(e)?
 				}
 			}
 		} else {
@@ -120,6 +129,6 @@ fn root_crate_dir() -> PathBuf {
 }
 
 /// Prompt the user to confirm an action
-fn confirm(question: &str) -> Result<bool, std::io::Error> {
+fn confirm(question: &str) -> Result<bool, dialoguer::Error> {
 	Confirm::new().with_prompt(question).interact()
 }
