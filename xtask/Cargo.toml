@@ -30,3 +30,6 @@ visibility = "0.1.0"
 
 [build-dependencies]
 walkdir = "2.5.0"
+
+[dev-dependencies]
+shakespeare = { path = ".." } # Doesn't need a version because this crate isn't published

@@ -1,22 +1,31 @@
-use std::fs::create_dir_all;
-use std::io::{Read, Write};
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::str::FromStr;
-
 use anyhow::Error;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::visit::Visit;
-use syn::{
-	parse2, parse_file, AttrStyle, Attribute, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro,
-	ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemTraitAlias, ItemType, ItemUnion, ItemUse, Meta,
-	MetaList,
-};
+use syn::{parse_file, AttrStyle, Attribute, Item, Meta, MetaList};
 
-use crate::stripped_macro::{actor, performance, role};
+use crate::stripped_macro::{make_actor, make_performance, make_role};
 
-fn expand_macro(attrs: &Vec<syn::Attribute>, thing: impl ToTokens) -> TokenStream {
+fn find_attribute<'a>(attrs: &'a Vec<Attribute>, needle: &str) -> Option<&'a Attribute> {
+	for a in attrs {
+		if a.style == AttrStyle::Outer {
+			match &a.meta {
+				Meta::Path(path) | Meta::List(MetaList { path, .. }) => {
+					let Some(leaf) = path.segments.last() else {
+						continue;
+					};
+					if leaf.ident.eq(needle) {
+						return Some(a);
+					}
+				}
+				Meta::NameValue(_) => continue,
+			}
+		}
+	}
+	None
+}
+/*
+fn expand_macro(attrs: &Vec<Attribute>, thing: impl ToTokens) -> TokenStream {
 	for a in attrs {
 		if a.style == AttrStyle::Outer {
 			match &a.meta {
@@ -55,52 +64,71 @@ fn expand_macro(attrs: &Vec<syn::Attribute>, thing: impl ToTokens) -> TokenStrea
 		}
 	}
 	thing.into_token_stream()
-}
+} */
 
 #[derive(Default)]
 struct Walker(TokenStream);
 
 impl<'ast> Visit<'ast> for Walker {
-	fn visit_item(&mut self, i: &'ast syn::Item) {
-		let attrs = match &i {
-			syn::Item::Const(ItemConst { attrs, .. })
-			| syn::Item::Enum(ItemEnum { attrs, .. })
-			| syn::Item::Fn(ItemFn { attrs, .. })
-			| syn::Item::Impl(ItemImpl { attrs, .. })
-			| syn::Item::Macro(ItemMacro { attrs, .. })
-			| syn::Item::Mod(ItemMod { attrs, .. })
-			| syn::Item::Static(ItemStatic { attrs, .. })
-			| syn::Item::Struct(ItemStruct { attrs, .. })
-			| syn::Item::Trait(ItemTrait { attrs, .. })
-			| syn::Item::TraitAlias(ItemTraitAlias { attrs, .. })
-			| syn::Item::Type(ItemType { attrs, .. })
-			| syn::Item::Union(ItemUnion { attrs, .. })
-			| syn::Item::Use(ItemUse { attrs, .. }) => attrs.clone(),
-
-			_ => unimplemented!(),
-		};
-		if attrs.is_empty()
-			|| matches!(
-				i,
-				syn::Item::Fn(_) | syn::Item::Struct(_) | syn::Item::Use(_) | syn::Item::Static(_)
-			) {
-			self.0.extend(i.into_token_stream());
-		} else {
-			let first_pass = expand_macro(&attrs, i);
-			let new_items: syn::File = parse2(first_pass).unwrap();
-			let tokens = if new_items.items.len() > 1
-				&& new_items
-					.items
-					.iter()
-					.any(|i| matches!(i, syn::Item::Mod(_)))
-			{
-				let mut subwalker = Walker::default();
-				subwalker.visit_file(&new_items);
-				subwalker.0
-			} else {
-				new_items.into_token_stream()
+	fn visit_item_mod(&mut self, i: &'ast syn::ItemMod) {
+		let attrs = &i.attrs;
+		let present = find_attribute(attrs, "actor");
+		if present.is_some() {
+			let tokens = match make_actor(i.clone()) {
+				Ok(actor_ouput) => actor_ouput.to_token_stream(),
+				Err(e) => e.into_compile_error(),
 			};
 			self.0.extend(tokens);
+		} else {
+			let mut subwalker = Walker::default();
+
+			if let Some((_, items)) = i.content.as_ref() {
+				for item in items {
+					subwalker.visit_item(item);
+				}
+
+				self.0.extend(subwalker.0);
+			} else {
+				self.0.extend(i.into_token_stream());
+			}
+		}
+	}
+
+	fn visit_item_trait(&mut self, i: &'ast syn::ItemTrait) {
+		let attrs = &i.attrs;
+		let present = find_attribute(attrs, "role");
+		if present.is_some() {
+			let tokens = match make_role(i.clone()) {
+				Ok(actor_ouput) => actor_ouput.to_token_stream(),
+				Err(e) => e.into_compile_error(),
+			};
+			self.0.extend(tokens);
+		} else {
+			self.0.extend(i.into_token_stream());
+		}
+	}
+
+	fn visit_item_impl(&mut self, i: &'ast syn::ItemImpl) {
+		let attrs = &i.attrs;
+		let present = find_attribute(attrs, "performance");
+		if present.is_some() {
+			let tokens = match make_performance(i.clone()) {
+				Ok(actor_ouput) => actor_ouput.to_token_stream(),
+				Err(e) => e.into_compile_error(),
+			};
+			self.0.extend(tokens);
+		} else {
+			self.0.extend(i.into_token_stream());
+		}
+	}
+
+	fn visit_item(&mut self, i: &'ast Item) {
+		//dbg!(&i);
+		match i {
+			syn::Item::Impl(i) => self.visit_item_impl(i),
+			syn::Item::Mod(i) => self.visit_item_mod(i),
+			syn::Item::Trait(i) => self.visit_item_trait(i),
+			els => self.0.extend(els.into_token_stream()),
 		}
 	}
 }
@@ -115,8 +143,13 @@ fn expand_test(contents: &str) -> Result<TokenStream, Error> {
 }
 
 pub fn expand_all_tests() -> Result<(), Error> {
-	let src = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("tests/");
-	let dest = PathBuf::from_str("../expanded/tests/")?;
+	use std::fs::create_dir_all;
+	use std::io::{Read, Write};
+	use std::path::PathBuf;
+	use std::process::{Command, Stdio};
+
+	let src = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("../tests/");
+	let dest = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("tests/expanded/");
 
 	for test_file in walkdir::WalkDir::new(&src).into_iter().filter_entry(|f| {
 		f.metadata().unwrap().is_dir() || f.path().extension().is_some_and(|p| p == "rs")

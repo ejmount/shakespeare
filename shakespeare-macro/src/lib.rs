@@ -19,8 +19,9 @@ mod interfacerewriter;
 mod macros;
 mod outputs;
 
-use proc_macro::TokenStream as TokenStream1;
+use proc_macro::TokenStream;
 use quote::ToTokens;
+use syn::parse::Parse;
 use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem};
 
 use crate::data::DataName;
@@ -32,10 +33,12 @@ use crate::outputs::actor::ActorOutput;
 use crate::outputs::perfdispatch::PerfDispatch;
 use crate::outputs::role::RoleOutput;
 
+#[cfg_attr(not(proc_macro), visibility::make(pub))]
 fn make_actor(module: ItemMod) -> Result<ActorOutput> {
 	ActorOutput::new(ActorDecl::new(module)?)
 }
 
+#[cfg_attr(not(proc_macro), visibility::make(pub))]
 fn make_performance(imp: ItemImpl) -> Result<PerfDispatch> {
 	let empty_perf_error = syn::Error::new_spanned(&imp, "Standalone performance needs methods");
 
@@ -64,6 +67,7 @@ fn make_performance(imp: ItemImpl) -> Result<PerfDispatch> {
 	}
 }
 
+#[cfg_attr(not(proc_macro), visibility::make(pub))]
 fn make_role(imp: ItemTrait) -> Result<RoleOutput> {
 	let name = imp.ident;
 	let items = imp.items;
@@ -75,30 +79,43 @@ fn make_role(imp: ItemTrait) -> Result<RoleOutput> {
 	RoleOutput::new(decl)
 }
 
-#[proc_macro_attribute]
-pub fn actor(_attr: TokenStream1, item: TokenStream1) -> TokenStream1 {
-	let module = syn::parse_macro_input!(item as ItemMod);
+/// The `syn::parse_macro_input` macro is unsuitable for how this code works outside of an actually proc-macro crate beacuse it hardcodes the error return type as `proc_macro::TokenStream`
+/// This creates problems when the xtask module tries to import it into a non-macro context.
+/// This code is functionally the same, except that, being an ordinary function, we can't return early.
+fn parse_macro_input<T: Parse>(tokens: TokenStream) -> ::std::result::Result<T, TokenStream> {
+	let tokens = proc_macro2::TokenStream::from(tokens); // Yes this looks redundant but it's so that TokenStream can be swapped out
+	syn::parse2(tokens).map_err(|err| TokenStream::from(err.to_compile_error()))
+}
 
-	match make_actor(module) {
-		Ok(actor_ouput) => actor_ouput.to_token_stream().into(),
-		Err(e) => e.into_compile_error().into_token_stream().into(),
+#[proc_macro_attribute]
+pub fn actor(_attr: TokenStream, item: TokenStream) -> TokenStream {
+	match parse_macro_input(item) {
+		Ok(module) => match make_actor(module) {
+			Ok(actor_ouput) => actor_ouput.to_token_stream().into(),
+			Err(e) => e.into_compile_error().into_token_stream().into(),
+		},
+		Err(err) => err,
 	}
 }
 
 #[proc_macro_attribute]
-pub fn performance(_attr: TokenStream1, item: TokenStream1) -> TokenStream1 {
-	let imp = syn::parse_macro_input!(item as ItemImpl);
-	match make_performance(imp) {
-		Ok(perf) => perf.to_token_stream().into(),
-		Err(e) => e.into_compile_error().into_token_stream().into(),
+pub fn performance(_attr: TokenStream, item: TokenStream) -> TokenStream {
+	match parse_macro_input(item) {
+		Ok(imp) => match make_performance(imp) {
+			Ok(perf) => perf.to_token_stream().into(),
+			Err(e) => e.into_compile_error().into_token_stream().into(),
+		},
+		Err(err) => err,
 	}
 }
 
 #[proc_macro_attribute]
-pub fn role(_attr: TokenStream1, item: TokenStream1) -> TokenStream1 {
-	let imp = syn::parse_macro_input!(item as ItemTrait);
-	match make_role(imp) {
-		Ok(role) => role.to_token_stream().into(),
-		Err(e) => e.into_compile_error().into_token_stream().into(),
+pub fn role(_attr: TokenStream, item: TokenStream) -> TokenStream {
+	match parse_macro_input(item) {
+		Ok(imp) => match make_role(imp) {
+			Ok(role) => role.to_token_stream().into(),
+			Err(e) => e.into_compile_error().into_token_stream().into(),
+		},
+		Err(err) => err,
 	}
 }
