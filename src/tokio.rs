@@ -1,10 +1,8 @@
-use async_trait::async_trait;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use super::{RoleReceiver, RoleSender};
 
-#[async_trait]
 impl<T: Send> RoleSender<T> for UnboundedSender<T> {
 	type Error = SendError<T>;
 
@@ -13,7 +11,6 @@ impl<T: Send> RoleSender<T> for UnboundedSender<T> {
 	}
 }
 
-#[async_trait]
 impl<T: Send> RoleReceiver<T> for UnboundedReceiver<T> {
 	async fn recv(&mut self) -> Option<T> {
 		self.recv().await
