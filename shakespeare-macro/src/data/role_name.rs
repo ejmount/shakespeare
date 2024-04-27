@@ -33,6 +33,10 @@ impl RoleName {
 		})
 	}
 
+	pub fn return_payload_path(&self) -> syn::Path {
+		update_path_leaf(self.0.clone(), |p| format_ident!("{}ReturnPayload", p))
+	}
+
 	pub fn sender_method_name(&self) -> Ident {
 		let field_name = self.queue_name();
 		format_ident!("push_to_{field_name}")
