@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use convert_case::{Case, Casing};
 use itertools::Itertools;
 use quote::{format_ident, ToTokens};
-use syn::{Fields, FieldsUnnamed, FnArg, ItemEnum, ItemImpl, Path, Result, Signature, Variant};
+use syn::{FnArg, ItemEnum, ItemImpl, Path, Result, Signature, Variant};
 
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
@@ -15,24 +15,15 @@ pub(crate) struct PayloadEnum {
 
 impl PayloadEnum {
 	pub fn new(payload_type: &Path, methods: &[Signature]) -> Result<PayloadEnum> {
-		let variants = map_or_bail!(methods, Self::make_variant);
+		let variants = map_or_bail!(methods, create_variant);
 
-		let payload_name = &payload_type.segments.last().unwrap().ident;
+		let impls = create_from_impls(payload_type, methods)?;
 
 		let definition = fallible_quote! {
-			pub enum #payload_name { #(#variants),* }
+			pub enum #payload_type { #(#variants),* }
 		}?;
 
-		let impls = create_from_impls(&variants, payload_type)?;
-
 		Ok(PayloadEnum { definition, impls })
-	}
-
-	fn make_variant(sig: &Signature) -> Result<Variant> {
-		let variant_name = format_ident!("{}", sig.ident.to_string().to_case(Case::UpperCamel));
-
-		let types = filter_unwrap!(&sig.inputs, FnArg::Typed).map(|p| &*p.ty);
-		fallible_quote! { #variant_name ((#(#types),*)) }
 	}
 }
 
@@ -45,33 +36,43 @@ impl ToTokens for PayloadEnum {
 	}
 }
 
-fn create_from_impls(variants: &Vec<Variant>, payload_type: &Path) -> Result<Vec<ItemImpl>> {
-	let fields = variants.iter().map(|v| &v.fields);
+fn create_variant(sig: &Signature) -> Result<Variant> {
+	let types = filter_unwrap!(&sig.inputs, FnArg::Typed).map(|p| &*p.ty);
 
-	let type_set: HashSet<_> = filter_unwrap!(fields, Fields::Unnamed)
-		.map(|f| f.unnamed.iter().map(|f| &f.ty).collect_vec())
+	let variant_name = format_ident!("{}", sig.ident.to_string().to_case(Case::UpperCamel));
+
+	fallible_quote! { #variant_name ((#(#types),*)) }
+}
+
+fn create_from_impls(payload_type: &Path, sigs: &[Signature]) -> Result<Vec<ItemImpl>> {
+	let type_vector_set: HashSet<Vec<_>> = sigs
+		.iter()
+		.map(|s| {
+			filter_unwrap!(&s.inputs, FnArg::Typed)
+				.map(|p| &*p.ty)
+				.collect()
+		})
 		.collect();
 
-	let mut impls = vec![];
-	if type_set.len() == variants.len() {
-		for var in variants {
-			let Fields::Unnamed(FieldsUnnamed { unnamed, .. }) = &var.fields else {
-				unreachable!()
-			};
-
-			let types = unnamed.iter().map(|p| &p.ty).collect_vec();
-			let name = &var.ident;
-
-			let from_impl = fallible_quote! {
-				impl From<#(#types),*> for #payload_type {
-					fn from(value: #(#types),*) -> Self {
-						Self::#name ( value )
-					}
-				}
-			}?;
-
-			impls.push(from_impl);
-		}
+	if type_vector_set.len() == sigs.len() {
+		let from_impls = map_or_bail!(&sigs, |s| signature_to_from(s, payload_type));
+		Ok(from_impls)
+	} else {
+		Ok(vec![])
 	}
-	Ok(impls)
+}
+
+fn signature_to_from(sig: &Signature, payload_type: &Path) -> Result<ItemImpl> {
+	let types = filter_unwrap!(&sig.inputs, FnArg::Typed)
+		.map(|p| &*p.ty)
+		.collect_vec();
+	let name = &sig.ident;
+	let from_impl = fallible_quote! {
+		impl From<#(#types),*> for #payload_type {
+			fn from(value: #(#types),*) -> Self {
+				Self::#name ( value )
+			}
+		}
+	}?;
+	Ok(from_impl)
 }
