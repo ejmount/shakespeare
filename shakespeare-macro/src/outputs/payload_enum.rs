@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use convert_case::{Case, Casing};
 use itertools::Itertools;
 use quote::{format_ident, ToTokens};
-use syn::{FnArg, ItemEnum, ItemImpl, Path, Result, Signature, Variant};
+use syn::{FnArg, ItemEnum, ItemImpl, Path, Result, ReturnType, Signature, Variant};
 
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
@@ -69,6 +69,74 @@ impl PayloadEnum {
 }
 
 impl ToTokens for PayloadEnum {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		self.definition.to_tokens(tokens);
+		for i in &self.impls {
+			i.to_tokens(tokens);
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct ReturnPayload {
+	definition: ItemEnum,
+	impls:      Vec<ItemImpl>,
+}
+
+impl ReturnPayload {
+	pub fn new(return_payload_type: &Path, methods: &[Signature]) -> Result<Option<ReturnPayload>> {
+		let variants = map_or_bail!(methods, Self::create_variant);
+
+		if variants.is_empty() {
+			return Ok(None);
+		}
+
+		let impls = map_or_bail!(methods, |m| Self::create_from_impl(return_payload_type, m));
+		let impls = impls.into_iter().flatten().collect_vec();
+
+		let definition = fallible_quote! {
+			pub enum #return_payload_type { #(#variants),* }
+		}?;
+
+		Ok(Some(ReturnPayload { definition, impls }))
+	}
+
+	fn create_variant(sig: &Signature) -> Result<Option<Variant>> {
+		let ReturnType::Type(_, ref ret_type) = &sig.output else {
+			return Ok(None);
+		};
+		let ret_type = &**ret_type;
+
+		let variant_name = format_ident!("{}", sig.ident.to_string().to_case(Case::UpperCamel));
+
+		Ok(Some(fallible_quote! { #variant_name (#ret_type) }?))
+	}
+
+	fn create_from_impl(payload_type: &Path, sig: &Signature) -> Result<Option<ItemImpl>> {
+		let ReturnType::Type(_, ret_type) = &sig.output else {
+			return Ok(None);
+		};
+
+		let variant_name = &sig.ident;
+
+		let from_impl = fallible_quote! {
+			impl TryFrom<#payload_type> for #ret_type {
+				type Error = ();
+				fn try_from(value: #payload_type) -> Self {
+					if let #payload_type::#variant_name(val) = value {
+						 Ok(val)
+					}
+					else {
+						return Err(());
+					}
+				}
+			}
+		}?;
+		Ok(Some(from_impl))
+	}
+}
+
+impl ToTokens for ReturnPayload {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.definition.to_tokens(tokens);
 		for i in &self.impls {

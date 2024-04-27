@@ -9,8 +9,8 @@
 #![warn(clippy::dbg_macro)]
 #![allow(clippy::module_name_repetitions)]
 #![forbid(unsafe_code)]
-#![forbid(clippy::todo)]
-#![forbid(clippy::unimplemented)]
+#![warn(clippy::todo)]
+#![warn(clippy::unimplemented)]
 #![forbid(future_incompatible)]
 
 mod data;

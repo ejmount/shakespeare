@@ -2,6 +2,7 @@ use quote::ToTokens;
 use syn::fold::Fold;
 use syn::{ItemImpl, ItemTrait, Result, TraitItem};
 
+use super::payload_enum::ReturnPayload;
 use crate::data::RoleName;
 use crate::declarations::role::RoleDecl;
 use crate::interfacerewriter::InterfaceRewriter;
@@ -10,9 +11,10 @@ use crate::outputs::payload_enum::PayloadEnum;
 
 #[derive(Debug)]
 pub struct RoleOutput {
-	payload_enum:     PayloadEnum,
-	trait_definition: ItemTrait,
-	role_impl:        ItemImpl,
+	payload_enum:        PayloadEnum,
+	return_payload_enum: Option<ReturnPayload>,
+	trait_definition:    ItemTrait,
+	role_impl:           ItemImpl,
 }
 
 impl RoleOutput {
@@ -24,7 +26,10 @@ impl RoleOutput {
 		} = role;
 		let role_name = RoleName::new(role_name);
 		let payload_type = role_name.payload_path();
+		let return_payload_type = role_name.return_payload_path();
+
 		let payload_enum = PayloadEnum::new(&payload_type, &signatures)?;
+		let return_payload_enum = ReturnPayload::new(&return_payload_type, &signatures)?;
 
 		let mut rewriter = InterfaceRewriter::new(&role_name);
 		let signatures = signatures.into_iter().map(|s| rewriter.fold_signature(s));
@@ -53,6 +58,7 @@ impl RoleOutput {
 
 		Ok(RoleOutput {
 			payload_enum,
+			return_payload_enum,
 			trait_definition,
 			role_impl,
 		})
@@ -62,6 +68,7 @@ impl RoleOutput {
 impl ToTokens for RoleOutput {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.payload_enum.to_tokens(tokens);
+		self.return_payload_enum.to_tokens(tokens);
 		self.trait_definition.to_tokens(tokens);
 		self.role_impl.to_tokens(tokens);
 	}
