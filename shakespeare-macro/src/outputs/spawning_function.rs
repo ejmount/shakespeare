@@ -100,34 +100,33 @@ impl SpawningFunction {
 					let stored_actor = Arc::clone(&actor);
 
 					let event_loop = async move {
+						let loop_lambda = async {
+							let timeout_sleep = sleep(IDLE_TIMEOUT);
+							pin!(timeout_sleep);
+							loop {
+								let outstanding_clients = #getter_name.with(Arc::strong_count);
+								select! {
+									#(#select_branches),*
+									_ = &mut timeout_sleep, if outstanding_clients > 1 => {
+										if outstanding_clients == 1 {
+											break;
+										}
+										else {
+											timeout_sleep.as_mut().reset(Instant::now() + IDLE_TIMEOUT)
+										}
+									},
+									else => { break; }
+								};
+							}
+						};
+
 						// SAFETY: The receive handles inside the branches are not safe to unwind
 						// But they're consumed by the closure, so we can never see them
 						// The senders might interact with a dead receiver though.
 						// If we assume that a panic will not happen **during** an operation on the receiver,
 						// then the control block will still be consistent at any point the sender looks at it
 						// even if the receiver was destroyed
-						let guarded_future = catch_future(
-							#getter_name.scope(stored_actor, async {
-								let timeout_sleep = sleep(IDLE_TIMEOUT);
-								pin!(timeout_sleep);
-								loop {
-									let outstanding_clients = #getter_name.with(Arc::strong_count);
-									select! {
-										#(#select_branches),*
-										_ = &mut timeout_sleep, if outstanding_clients > 1 => {
-											if outstanding_clients == 1 {
-												break;
-											}
-											else {
-												timeout_sleep.as_mut().reset(Instant::now() + IDLE_TIMEOUT)
-											}
-										},
-										else => { break; }
-									};
-								}
-							})
-						);
-
+						let guarded_future = catch_future(#getter_name.scope(stored_actor, loop_lambda));
 
 						let result = guarded_future.await;
 
