@@ -33,7 +33,7 @@ impl RoleName {
 		})
 	}
 
-	pub fn acccessor_name(&self) -> Ident {
+	pub fn sender_method_name(&self) -> Ident {
 		let field_name = self.queue_name();
 		format_ident!("push_to_{field_name}")
 	}

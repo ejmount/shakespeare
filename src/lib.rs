@@ -56,7 +56,7 @@ where
 	tokio_export::spawn(async move {
 		stream
 			.for_each(|msg| async {
-				let _ = actor.clone_sender().send(msg.into()).await;
+				actor.send(msg.into()).await;
 			})
 			.await;
 	});
@@ -70,6 +70,6 @@ where
 {
 	tokio_export::spawn(async move {
 		let actor = actor;
-		let _ = actor.clone_sender().send(fut.await.into()).await;
+		actor.send(fut.await.into()).await;
 	});
 }

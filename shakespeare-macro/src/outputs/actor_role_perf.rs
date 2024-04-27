@@ -21,11 +21,11 @@ impl ActorPerf {
 		role_name: &RoleName,
 		handlers: &[FunctionItem],
 	) -> Result<ActorPerf> {
-		let accessor = role_name.acccessor_name();
+		let sender_method_name = role_name.sender_method_name();
 		let sending_methods = map_or_bail!(handlers, |fun| create_sending_method(
 			payload_type,
 			fun,
-			&accessor
+			&sender_method_name
 		));
 
 		let mut rewriter = InterfaceRewriter::new(role_name);
@@ -34,11 +34,9 @@ impl ActorPerf {
 			.map(|i| rewriter.fold_impl_item_fn(i))
 			.collect_vec();
 
-		let getter_name = role_name.sender_getter_name();
-
 		let sender_get: ImplItemFn = fallible_quote! {
-			fn get_sender(&self) -> &::shakespeare::Role2Sender<dyn #role_name> {
-				self.#getter_name()
+			async fn send(&self, val: shakespeare::Role2Payload<dyn #role_name>) {
+				let _ = self.#sender_method_name(val).await;
 			}
 		}?;
 
@@ -63,7 +61,7 @@ impl ToTokens for ActorPerf {
 fn create_sending_method(
 	payload_type: &Path,
 	fun: &FunctionItem,
-	accessor: &Ident,
+	sender_method_name: &Ident,
 ) -> Result<FunctionItem> {
 	let params: Vec<_> = filter_unwrap!(&fun.sig.inputs, FnArg::Typed)
 		.map(|t| &t.pat)
@@ -79,8 +77,7 @@ fn create_sending_method(
 			use shakespeare::{RoleReceiver, RoleSender};
 			let msg = (#(#params),*);
 			let payload = #payload_type::#variant_name(msg);
-			let _ = self.#accessor(payload).await;
-			Ok(())
+			self.#sender_method_name(payload).await
 		}
 	}?;
 
