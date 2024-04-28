@@ -46,17 +46,21 @@ impl PayloadEnum {
 
 		if type_vector_set.len() == sigs.len() {
 			let from_impls = map_or_bail!(&sigs, |s| Self::signature_to_from(s, payload_type));
+			let from_impls = from_impls.into_iter().flatten().collect_vec();
 			Ok(from_impls)
 		} else {
 			Ok(vec![])
 		}
 	}
 
-	fn signature_to_from(sig: &Signature, payload_type: &Path) -> Result<ItemImpl> {
+	fn signature_to_from(sig: &Signature, payload_type: &Path) -> Result<Option<ItemImpl>> {
 		let types = filter_unwrap!(&sig.inputs, FnArg::Typed)
 			.map(|p| &*p.ty)
 			.collect_vec();
-		let name = &sig.ident;
+		if types.is_empty() {
+			return Ok(None);
+		}
+		let name = format_ident!("{}", sig.ident.to_string().to_case(Case::UpperCamel));
 		let from_impl = fallible_quote! {
 			impl From<#(#types),*> for #payload_type {
 				fn from(value: #(#types),*) -> Self {
@@ -64,7 +68,7 @@ impl PayloadEnum {
 				}
 			}
 		}?;
-		Ok(from_impl)
+		Ok(Some(from_impl))
 	}
 }
 
@@ -84,12 +88,8 @@ pub struct ReturnPayload {
 }
 
 impl ReturnPayload {
-	pub fn new(return_payload_type: &Path, methods: &[Signature]) -> Result<Option<ReturnPayload>> {
+	pub fn new(return_payload_type: &Path, methods: &[Signature]) -> Result<ReturnPayload> {
 		let variants = map_or_bail!(methods, Self::create_variant);
-
-		if variants.is_empty() {
-			return Ok(None);
-		}
 
 		let impls = map_or_bail!(methods, |m| Self::create_from_impl(return_payload_type, m));
 		let impls = impls.into_iter().flatten().collect_vec();
@@ -98,7 +98,7 @@ impl ReturnPayload {
 			pub enum #return_payload_type { #(#variants),* }
 		}?;
 
-		Ok(Some(ReturnPayload { definition, impls }))
+		Ok(ReturnPayload { definition, impls })
 	}
 
 	fn create_variant(sig: &Signature) -> Result<Option<Variant>> {

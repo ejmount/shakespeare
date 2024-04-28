@@ -28,6 +28,14 @@ impl SelfGetter {
 			}
 		}?;
 
+		let actor_getter: Item = fallible_quote! {
+			impl #actor_name {
+				pub fn get_shell() -> ::std::sync::Arc<#actor_name> {
+					#getter_item.with(Clone::clone)
+				}
+			}
+		}?;
+
 		Ok(SelfGetter {
 			statik_item,
 			getter,
