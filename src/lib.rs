@@ -8,8 +8,8 @@
 #![warn(clippy::dbg_macro)]
 //#![warn(unused_crate_dependencies)]
 #![forbid(unsafe_code)]
-#![forbid(clippy::todo)]
-#![forbid(clippy::unimplemented)]
+#![warn(clippy::todo)]
+#![warn(clippy::unimplemented)]
 
 use std::any::Any;
 use std::future::Future;

@@ -95,7 +95,7 @@ fn create_inherent_impl(
 	actor_vis: &Visibility,
 	actor_name: &ActorName,
 ) -> Result<ItemImpl> {
-	fn sender_method_name_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
+	fn sender_method_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
 		let error_path: Path = fallible_quote! { shakespeare::Role2SendError<dyn #role_name> }?;
 		let payload_path = role_name.payload_path();
 		let field_name = role_name.queue_name();
@@ -121,9 +121,8 @@ fn create_inherent_impl(
 		}
 	}
 
-	let sender_method_names = map_or_bail!(&role_names, |name| sender_method_name_from_name(
-		name, actor_vis
-	));
+	let sender_method_names =
+		map_or_bail!(&role_names, |name| sender_method_from_name(name, actor_vis));
 	let getters = map_or_bail!(&role_names, |name| sender_getter_from_name(name, actor_vis));
 	fallible_quote! {
 		impl #actor_name {
