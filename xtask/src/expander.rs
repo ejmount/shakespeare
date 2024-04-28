@@ -1,8 +1,8 @@
 use anyhow::Error;
 use proc_macro2::TokenStream;
-use quote::ToTokens;
+use quote::{quote, ToTokens};
 use syn::visit::Visit;
-use syn::{parse_file, AttrStyle, Attribute, Item, Meta, MetaList};
+use syn::{parse_file, AttrStyle, Attribute, Item, ItemMod, Meta, MetaList};
 
 use crate::stripped_macro::{make_actor, make_performance, make_role};
 
@@ -24,47 +24,6 @@ fn find_attribute<'a>(attrs: &'a Vec<Attribute>, needle: &str) -> Option<&'a Att
 	}
 	None
 }
-/*
-fn expand_macro(attrs: &Vec<Attribute>, thing: impl ToTokens) -> TokenStream {
-	for a in attrs {
-		if a.style == AttrStyle::Outer {
-			match &a.meta {
-				Meta::Path(path) | Meta::List(MetaList { path, .. }) => {
-					let Some(leaf) = path.segments.last() else {
-						continue;
-					};
-					if leaf.ident.eq("actor") {
-						let attr_tokens = attrs
-							.iter()
-							.cloned()
-							.map(Attribute::into_token_stream)
-							.collect();
-
-						return actor(attr_tokens, thing.into_token_stream());
-					} else if leaf.ident.eq("role") {
-						let attr_tokens = attrs
-							.iter()
-							.cloned()
-							.map(Attribute::into_token_stream)
-							.collect();
-
-						return role(attr_tokens, thing.into_token_stream());
-					} else if leaf.ident.eq("performance") {
-						let attr_tokens = attrs
-							.iter()
-							.cloned()
-							.map(Attribute::into_token_stream)
-							.collect();
-
-						return performance(attr_tokens, thing.into_token_stream());
-					}
-				}
-				Meta::NameValue(_) => continue,
-			}
-		}
-	}
-	thing.into_token_stream()
-} */
 
 #[derive(Default)]
 struct Walker(TokenStream);
@@ -82,12 +41,27 @@ impl<'ast> Visit<'ast> for Walker {
 		} else {
 			let mut subwalker = Walker::default();
 
-			if let Some((_, items)) = i.content.as_ref() {
+			let ItemMod {
+				attrs,
+				ident,
+				content,
+				unsafety,
+				vis,
+				..
+			} = &i;
+
+			if let Some((_, items)) = content.as_ref() {
 				for item in items {
 					subwalker.visit_item(item);
 				}
+				let Walker(tok) = subwalker;
 
-				self.0.extend(subwalker.0);
+				self.0.extend(quote! {
+					#(#attrs)*
+					#vis #unsafety mod #ident {
+						#tok
+					}
+				});
 			} else {
 				self.0.extend(i.into_token_stream());
 			}
@@ -163,6 +137,7 @@ pub fn expand_all_tests() -> Result<(), Error> {
 			continue;
 		}
 		let contents = std::fs::read_to_string(test_file.path())?;
+		let contents = contents.replace("crate::", "crate::expanded::");
 
 		let expanded = expand_test(&contents)?;
 
