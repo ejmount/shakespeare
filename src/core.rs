@@ -1,9 +1,12 @@
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
-use ::tokio::task::JoinHandle;
-use async_trait::async_trait;
 use futures::Future;
+use tokio::task::JoinHandle;
+
+use crate::returnval::ReturnEnvelope;
+use crate::Role2SendError;
 
 pub enum ActorOutcome<A: ActorShell> {
 	Aborted(tokio::task::JoinError),
@@ -60,15 +63,12 @@ impl<A: ActorShell> Debug for ActorHandle<A> {
 impl<A: ActorShell> Future for ActorHandle<A> {
 	type Output = ActorOutcome<A>;
 
-	fn poll(
-		self: std::pin::Pin<&mut Self>,
-		cx: &mut std::task::Context<'_>,
-	) -> std::task::Poll<Self::Output> {
+	fn poll(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let handle = &mut self.get_mut().0;
 		tokio::pin!(handle);
 		match handle.poll(cx) {
-			std::task::Poll::Pending => std::task::Poll::Pending,
-			std::task::Poll::Ready(result) => match result {
+			Poll::Pending => Poll::Pending,
+			Poll::Ready(result) => match result {
 				Ok(Ok(e)) => ActorOutcome::Exit(e),
 				Ok(Err(f)) => ActorOutcome::Panic(f),
 				Err(e) => ActorOutcome::Aborted(e),
@@ -109,7 +109,7 @@ impl<A: ActorShell> ActorSpawn<A> {
 #[doc(hidden)]
 #[trait_variant::make(Send)]
 pub trait RoleSender<T: Send>: Sync + Send + Clone {
-	type Error;
+	type Error: Send;
 	async fn send(&self, msg: T) -> Result<(), Self::Error>;
 }
 
@@ -123,7 +123,7 @@ pub trait RoleReceiver<T: Send> {
 #[doc(hidden)]
 pub trait Channel {
 	type Input;
-	type Item: Send + Sized;
+	type Item: Send;
 	type Sender: RoleSender<Self::Item>;
 	type Receiver: RoleReceiver<Self::Item>;
 	fn new(init: Self::Input) -> (Self::Sender, Self::Receiver);
@@ -140,6 +140,8 @@ pub trait Channel {
 #[trait_variant::make(Send)]
 pub trait Role: 'static + Sync + Send {
 	type Payload: Sized + Send;
-	type Channel: Channel<Item = Self::Payload>;
-	async fn send(&self, val: Self::Payload);
+	type Return: Sized + Send;
+	type Channel: Channel<Item = ReturnEnvelope<Self>>;
+	fn send(&self, val: Self::Payload);
+	async fn enqueue(&self, val: ReturnEnvelope<Self>) -> Result<(), Role2SendError<Self>>;
 }

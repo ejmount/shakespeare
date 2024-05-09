@@ -71,6 +71,7 @@ impl SpawningFunction {
 
 		let constructor: Expr = fallible_quote! {
 			#actor_name {
+				this: weak.clone(),
 				#(#actor_fields),*
 			}
 		}?;
@@ -96,7 +97,7 @@ impl SpawningFunction {
 					const IDLE_TIMEOUT: Duration = Duration::from_millis(50);
 
 					#(#queue_constructions)*
-					let actor = Arc::new(#constructor);
+					let actor = Arc::new_cyclic(|weak| { #constructor });
 					let stored_actor = Arc::clone(&actor);
 
 					let event_loop = async move {

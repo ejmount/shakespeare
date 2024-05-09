@@ -19,20 +19,23 @@ impl<'a> Fold for InterfaceRewriter<'a> {
 		parse_quote! { &self }
 	}
 
-	fn fold_return_type(&mut self, _: ReturnType) -> ReturnType {
-		let role_name = &self.role_name;
-		parse_quote! {-> Result <(), ::shakespeare::Role2SendError<dyn #role_name>> }
-	}
+	fn fold_signature(&mut self, sig: syn::Signature) -> syn::Signature {
+		let mut sig = syn::fold::fold_signature(self, sig);
 
-	fn fold_signature(&mut self, i: syn::Signature) -> syn::Signature {
 		// Visit deeper
-		let sig = syn::fold::fold_signature(self, i);
+		let role_name = self.role_name;
 
-		if sig.asyncness.is_none() {
-			parse_quote! { async #sig }
+		sig.asyncness = None;
+		let old_return = if let ReturnType::Type(_, ret) = sig.output {
+			(*ret).clone()
 		} else {
-			sig
-		}
+			parse_quote!(())
+		};
+		sig.output = parse_quote!(
+			-> ::shakespeare::Envelope<dyn #role_name, #old_return>
+		);
+
+		sig
 	}
 
 	fn fold_block(&mut self, i: Block) -> Block {

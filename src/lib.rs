@@ -16,18 +16,23 @@ use std::future::Future;
 use std::sync::Arc;
 
 #[doc(hidden)]
+pub use ::async_trait as async_trait_export;
+#[doc(hidden)]
 pub use ::tokio as tokio_export;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 pub use shakespeare_macro::{actor, performance, role};
 #[doc(hidden)]
 pub use tokio::TokioUnbounded;
 
 mod core;
+mod returnval;
 mod tokio;
 
 pub use core::{
 	ActorHandle, ActorOutcome, ActorShell, ActorSpawn, Channel, Role, RoleReceiver, RoleSender,
 };
+
+pub use returnval::{Envelope, ReturnEnvelope};
 
 #[doc(hidden)]
 pub type Role2Payload<R> = <R as Role>::Payload;
@@ -36,7 +41,7 @@ pub type Role2Receiver<R> = <<R as Role>::Channel as Channel>::Receiver;
 #[doc(hidden)]
 pub type Role2Sender<R> = <<R as Role>::Channel as Channel>::Sender;
 #[doc(hidden)]
-pub type Role2SendError<R> = <Role2Sender<R> as RoleSender<<R as Role>::Payload>>::Error;
+pub type Role2SendError<R> = <Role2Sender<R> as RoleSender<ReturnEnvelope<R>>>::Error;
 
 #[doc(hidden)]
 pub fn catch_future<T>(fut: T) -> impl Future<Output = Result<T::Output, Box<dyn Any + Send>>>
@@ -46,6 +51,8 @@ where
 	futures::future::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(fut))
 }
 
+#[allow(clippy::pedantic)]
+#[allow(unused)]
 pub fn add_stream<R, S>(actor: Arc<R>, stream: S)
 where
 	R: Role + ?Sized,
@@ -53,15 +60,23 @@ where
 	R::Payload: From<S::Item>,
 	<S as Stream>::Item: Send,
 {
+	use futures::StreamExt;
 	tokio_export::spawn(async move {
 		stream
 			.for_each(|msg| async {
-				actor.send(msg.into()).await;
+				let payload = msg.into();
+				let envelope = ReturnEnvelope {
+					payload,
+					return_path: returnval::ReturnPath::Discard,
+				};
+				actor.enqueue(envelope).await;
 			})
 			.await;
 	});
 }
 
+#[allow(clippy::pedantic)]
+#[allow(unused)]
 pub fn add_future<R, F>(actor: Arc<R>, fut: F)
 where
 	R: Role + ?Sized,
@@ -70,6 +85,11 @@ where
 {
 	tokio_export::spawn(async move {
 		let actor = actor;
-		actor.send(fut.await.into()).await;
+		let payload = fut.await.into();
+		let envelope = ReturnEnvelope {
+			payload,
+			return_path: returnval::ReturnPath::Discard,
+		};
+		actor.enqueue(envelope).await;
 	});
 }

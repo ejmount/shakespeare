@@ -27,6 +27,7 @@ tokio = { version = "1.37.0", features = ["macros", "full"] }
 shakespeare-macro = { path = "shakespeare-macro", version = "=0.0.1" }
 futures = "0.3.30"
 trait-variant = "0.1.2"
+pin-project = "1.1.5"
 
 
 [dev-dependencies]
