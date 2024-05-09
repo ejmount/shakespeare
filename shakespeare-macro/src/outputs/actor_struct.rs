@@ -31,6 +31,7 @@ impl ActorStruct {
 		let strukt = fallible_quote! {
 			#[derive(Clone)]
 			#actor_vis struct #actor_name {
+				this: ::std::sync::Weak<Self>,
 				#(#fields),*
 			}
 		}?;
@@ -69,14 +70,14 @@ fn create_meta_trait_impl(
 	let panic_type =
 		fallible_quote!(std::boxed::Box<dyn std::any::Any + std::marker::Send>).unwrap();
 	let panic_return = panic_handler.as_ref().map_or(&panic_type, |f| {
-		if let syn::ReturnType::Type(_, ref b) = f.sig.output {
+		if let syn::ReturnType::Type(_, b) = &f.sig.output {
 			&**b
 		} else {
 			&unit_type
 		}
 	});
 	let exit_return = exit_handler.as_ref().map_or(&unit_type, |f| {
-		if let syn::ReturnType::Type(_, ref b) = f.sig.output {
+		if let syn::ReturnType::Type(_, b) = &f.sig.output {
 			&**b
 		} else {
 			&unit_type
@@ -96,14 +97,14 @@ fn create_inherent_impl(
 	actor_name: &ActorName,
 ) -> Result<ItemImpl> {
 	fn sender_method_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
-		let error_path: Path = fallible_quote! { shakespeare::Role2SendError<dyn #role_name> }?;
-		let payload_path = role_name.payload_path();
+		let error_path: Path = fallible_quote! { ::shakespeare::Role2SendError<dyn #role_name> }?;
+
 		let field_name = role_name.queue_name();
 
-		let acccessor_name = role_name.sender_method_name();
+		let acccessor_name: syn::Ident = role_name.sender_method_name();
 
 		fallible_quote! {
-			#vis async fn #acccessor_name(&self, payload: #payload_path) -> Result<(), #error_path>
+			#vis async fn #acccessor_name(&self, payload: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), #error_path>
 			{
 				self.#field_name.send(payload)
 			}

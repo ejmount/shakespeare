@@ -22,14 +22,22 @@ impl PerfDispatch {
 		let handlers = &perf.handlers;
 		let dispatch_method_name = role_name.method_name();
 		let payload_type = role_name.payload_path();
+		let return_payload_type = role_name.return_payload_path();
 
 		if perf.handlers.is_empty() {
 			Ok(None)
 		} else {
 			Ok(PerfDispatch {
-				actor_impl:  ActorPerf::new(actor_path, &payload_type, &role_name, handlers)?,
+				actor_impl:  ActorPerf::new(
+					actor_path,
+					&payload_type,
+					&return_payload_type,
+					&role_name,
+					handlers,
+				)?,
 				dispatch_fn: DispatchFunction::new(
 					&data_name,
+					&role_name,
 					&payload_type,
 					&dispatch_method_name,
 					handlers,

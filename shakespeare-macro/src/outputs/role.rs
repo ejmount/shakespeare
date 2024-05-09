@@ -1,6 +1,6 @@
 use quote::ToTokens;
 use syn::fold::Fold;
-use syn::{ItemImpl, ItemTrait, Result, TraitItem};
+use syn::{ItemImpl, ItemTrait, Result};
 
 use super::payload_enum::ReturnPayload;
 use crate::data::RoleName;
@@ -12,7 +12,7 @@ use crate::outputs::payload_enum::PayloadEnum;
 #[derive(Debug)]
 pub struct RoleOutput {
 	payload_enum:        PayloadEnum,
-	return_payload_enum: Option<ReturnPayload>,
+	return_payload_enum: ReturnPayload,
 	trait_definition:    ItemTrait,
 	role_impl:           ItemImpl,
 }
@@ -34,24 +34,26 @@ impl RoleOutput {
 		let mut rewriter = InterfaceRewriter::new(&role_name);
 		let signatures = signatures.into_iter().map(|s| rewriter.fold_signature(s));
 
-		let get_sender: TraitItem = fallible_quote! {
-			async fn send(&self, val: #payload_type);
-		}?;
-
 		let trait_definition = fallible_quote! {
-			#[::async_trait::async_trait]
-			#vis trait #role_name: 'static + Send + Sync  {
+			#[::shakespeare::async_trait_export::async_trait]
+			#vis trait #role_name: 'static + Send + Sync {
 				#(#signatures;)*
-				#get_sender
+				fn send(&self, val: #payload_type) -> ::shakespeare::Envelope<dyn #role_name, #return_payload_type>;
+				async fn enqueue(&self, val: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>;
+				//fn listen_for(&self, msg: ::shakespeare::Envelope<dyn #role_name>);
 			}
 		}?;
 
 		let role_impl = fallible_quote! {
-			impl ::shakespeare::Role for dyn #role_name {
+			impl<'a> ::shakespeare::Role for dyn #role_name+'a {
 				type Payload = #payload_type;
-				type Channel = ::shakespeare::TokioUnbounded<Self::Payload>;
-				async fn send(&self, val: #payload_type) {
-					self.send(val).await;
+				type Return = #return_payload_type;
+				type Channel = ::shakespeare::TokioUnbounded<::shakespeare::ReturnEnvelope<dyn #role_name>>;
+				fn send(&self, val: #payload_type) {
+					<Self as #role_name>::send(self, val);
+				}
+				async fn enqueue(&self, val: ::shakespeare::ReturnEnvelope<Self>) -> Result<(), ::shakespeare::Role2SendError<Self>> {
+					self.enqueue(val).await
 				}
 			}
 		}?;
