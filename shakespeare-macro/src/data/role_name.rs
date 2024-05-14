@@ -6,10 +6,10 @@ use syn::Path;
 use super::{update_path_leaf, MethodName};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RoleName(Path);
+pub(crate) struct RoleName(Path);
 
 impl RoleName {
-	pub fn new(p: Path) -> RoleName {
+	pub(crate) fn new(p: Path) -> RoleName {
 		debug_assert!(!p.segments.is_empty());
 		RoleName(p)
 	}
@@ -18,31 +18,31 @@ impl RoleName {
 		self.0.segments.last().as_ref().unwrap().ident.to_string()
 	}
 
-	pub fn queue_name(&self) -> Ident {
+	pub(crate) fn queue_name(&self) -> Ident {
 		format_ident!("{}", self.path_leaf().to_case(Case::Snake))
 	}
 
-	pub fn method_name(&self) -> MethodName {
+	pub(crate) fn method_name(&self) -> MethodName {
 		let role_name = self.path_leaf();
 		format_ident!("{}", format!("perform_{role_name}").to_case(Case::Snake))
 	}
 
-	pub fn payload_path(&self) -> syn::Path {
+	pub(crate) fn payload_path(&self) -> syn::Path {
 		update_path_leaf(self.0.clone(), |data_name| {
 			format_ident!("{}Payload", data_name)
 		})
 	}
 
-	pub fn return_payload_path(&self) -> syn::Path {
+	pub(crate) fn return_payload_path(&self) -> syn::Path {
 		update_path_leaf(self.0.clone(), |p| format_ident!("{}ReturnPayload", p))
 	}
 
-	pub fn sender_method_name(&self) -> Ident {
+	pub(crate) fn sender_method_name(&self) -> Ident {
 		let field_name = self.queue_name();
 		format_ident!("push_to_{field_name}")
 	}
 
-	pub fn sender_getter_name(&self) -> Ident {
+	pub(crate) fn sender_getter_name(&self) -> Ident {
 		format_ident!("get_{}_sender", self.path_leaf())
 	}
 }

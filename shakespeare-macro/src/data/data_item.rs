@@ -4,7 +4,7 @@ use syn::{Item, ItemEnum, ItemStruct, ItemUnion, Path, PathSegment};
 use super::DataName;
 
 #[derive(Clone, Debug)]
-pub enum DataItem {
+pub(crate) enum DataItem {
 	Struct(ItemStruct),
 	Enum(ItemEnum),
 	Union(ItemUnion),

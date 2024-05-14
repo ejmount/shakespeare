@@ -9,14 +9,14 @@ use crate::declarations::performance::PerformanceDecl;
 use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
-pub struct ActorStruct {
+pub(crate) struct ActorStruct {
 	strukt:                  ItemStruct,
 	sender_method_name_impl: ItemImpl,
 	meta_trait:              ItemImpl,
 }
 
 impl ActorStruct {
-	pub fn new(actor: &ActorDecl) -> Result<ActorStruct> {
+	pub(crate) fn new(actor: &ActorDecl) -> Result<ActorStruct> {
 		let ActorDecl {
 			actor_name,
 			performances,

@@ -12,7 +12,7 @@ pub(crate) struct SelfGetter {
 }
 
 impl SelfGetter {
-	pub fn new(actor_name: &ActorName, data_name: &DataName) -> Result<SelfGetter> {
+	pub(crate) fn new(actor_name: &ActorName, data_name: &DataName) -> Result<SelfGetter> {
 		let getter_item = actor_name.get_static_item_name();
 
 		let statik_item: Item = fallible_quote! {

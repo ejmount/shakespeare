@@ -6,13 +6,13 @@ use super::dispatch_core_fn::DispatchFunction;
 use crate::data::{ActorName, DataName};
 use crate::declarations::performance::PerformanceDecl;
 #[derive(Debug)]
-pub struct PerfDispatch {
-	actor_impl:  ActorPerf,
+pub(crate) struct PerfDispatch {
+	actor_impl: ActorPerf,
 	dispatch_fn: DispatchFunction,
 }
 
 impl PerfDispatch {
-	pub fn new(
+	pub(crate) fn new(
 		perf: &PerformanceDecl,
 		actor_path: &ActorName,
 		data_name: &DataName,
@@ -28,7 +28,7 @@ impl PerfDispatch {
 			Ok(None)
 		} else {
 			Ok(PerfDispatch {
-				actor_impl:  ActorPerf::new(
+				actor_impl: ActorPerf::new(
 					actor_path,
 					&payload_type,
 					&return_payload_type,

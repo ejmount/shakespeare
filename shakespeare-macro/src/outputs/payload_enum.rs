@@ -11,11 +11,11 @@ use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 #[derive(Debug)]
 pub(crate) struct PayloadEnum {
 	definition: ItemEnum,
-	impls: Vec<ItemImpl>,
+	impls:      Vec<ItemImpl>,
 }
 
 impl PayloadEnum {
-	pub fn new(payload_type: &Path, methods: &[Signature]) -> Result<PayloadEnum> {
+	pub(crate) fn new(payload_type: &Path, methods: &[Signature]) -> Result<PayloadEnum> {
 		let variants = map_or_bail!(methods, Self::create_variant);
 
 		let impls = Self::create_from_impls(payload_type, methods)?;
@@ -82,13 +82,13 @@ impl ToTokens for PayloadEnum {
 }
 
 #[derive(Debug)]
-pub struct ReturnPayload {
+pub(crate) struct ReturnPayload {
 	definition: ItemEnum,
-	impls: Vec<ItemImpl>,
+	impls:      Vec<ItemImpl>,
 }
 
 impl ReturnPayload {
-	pub fn new(return_payload_type: &Path, methods: &[Signature]) -> Result<ReturnPayload> {
+	pub(crate) fn new(return_payload_type: &Path, methods: &[Signature]) -> Result<ReturnPayload> {
 		let variants = map_or_bail!(methods, Self::create_variant);
 
 		let impls = Self::create_output_from_impls(return_payload_type, methods)?;

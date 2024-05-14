@@ -10,7 +10,7 @@ use crate::macros::fallible_quote;
 use crate::outputs::payload_enum::PayloadEnum;
 
 #[derive(Debug)]
-pub struct RoleOutput {
+pub(crate) struct RoleOutput {
 	payload_enum:        PayloadEnum,
 	return_payload_enum: ReturnPayload,
 	trait_definition:    ItemTrait,
@@ -18,7 +18,7 @@ pub struct RoleOutput {
 }
 
 impl RoleOutput {
-	pub fn new(role: RoleDecl) -> Result<RoleOutput> {
+	pub(crate) fn new(role: RoleDecl) -> Result<RoleOutput> {
 		let RoleDecl {
 			name: role_name,
 			signatures,

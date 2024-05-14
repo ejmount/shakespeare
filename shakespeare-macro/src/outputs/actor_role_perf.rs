@@ -7,12 +7,12 @@ use crate::declarations::performance::make_variant_name;
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
 #[derive(Debug)]
-pub struct ActorPerf {
+pub(crate) struct ActorPerf {
 	imp: ItemImpl,
 }
 
 impl ActorPerf {
-	pub fn new(
+	pub(crate) fn new(
 		actor_path: &ActorName,
 		payload_type: &Path,
 		return_payload_type: &Path,

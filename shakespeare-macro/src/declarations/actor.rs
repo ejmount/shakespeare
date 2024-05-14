@@ -16,15 +16,15 @@ enum ActorInternal {
 	ExitHandler(ItemFn),
 }
 
-pub struct ActorDecl {
-	pub actor_name:    ActorName,
-	pub actor_vis:     Visibility,
-	pub data_item:     DataItem,
-	pub panic_handler: Option<ItemFn>,
-	pub exit_handler:  Option<ItemFn>,
-	pub performances:  Vec<PerformanceDecl>,
-	pub roles:         Vec<RoleDecl>,
-	pub misc:          Vec<Item>,
+pub(crate) struct ActorDecl {
+	pub(crate) actor_name:    ActorName,
+	pub(crate) actor_vis:     Visibility,
+	pub(crate) data_item:     DataItem,
+	pub(crate) panic_handler: Option<ItemFn>,
+	pub(crate) exit_handler:  Option<ItemFn>,
+	pub(crate) performances:  Vec<PerformanceDecl>,
+	pub(crate) roles:         Vec<RoleDecl>,
+	pub(crate) misc:          Vec<Item>,
 }
 
 type Fallible<T> = Result<Option<T>, Error>;
@@ -37,7 +37,7 @@ static HANDLERS: &[fn(&Item) -> Fallible<ActorInternal>] = &[
 ];
 
 impl ActorDecl {
-	pub fn new(module: ItemMod) -> Result<ActorDecl, Error> {
+	pub(crate) fn new(module: ItemMod) -> Result<ActorDecl, Error> {
 		let mut performances = vec![];
 		let mut roles = vec![];
 		let mut data = vec![];
@@ -99,7 +99,7 @@ impl ActorDecl {
 		};
 
 		let actor_ident = &module.ident;
-		let actor_name = ActorName(fallible_quote! { #actor_ident }?);
+		let actor_name = ActorName::new(fallible_quote! { #actor_ident }?);
 
 		// Replace this with an impl block so we don't have to disambigate
 		if let Some(handler) = panic_handler.as_mut() {

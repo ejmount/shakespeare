@@ -5,11 +5,11 @@ use crate::data::RoleName;
 
 /// Rewrites the plain method from a role/performance block to have the correct signature for the actor wrapper.
 /// Can be called on either bare signatures or methods, so we can't fill in the body at this point
-pub struct InterfaceRewriter<'a> {
+pub(crate) struct InterfaceRewriter<'a> {
 	role_name: &'a RoleName,
 }
 impl<'a> InterfaceRewriter<'a> {
-	pub fn new(role_name: &RoleName) -> InterfaceRewriter {
+	pub(crate) fn new(role_name: &RoleName) -> InterfaceRewriter {
 		InterfaceRewriter { role_name }
 	}
 }

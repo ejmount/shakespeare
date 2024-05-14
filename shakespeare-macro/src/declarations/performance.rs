@@ -7,17 +7,17 @@ use crate::data::{FunctionItem, RoleName};
 use crate::macros::filter_unwrap;
 
 #[derive(structmeta::StructMeta)]
-pub struct PerformanceAttribute {
-	pub canonical: structmeta::Flag,
+pub(crate) struct PerformanceAttribute {
+	pub(crate) canonical: structmeta::Flag,
 }
 
-pub struct PerformanceDecl {
-	pub role_name: RoleName,
-	pub handlers:  Vec<FunctionItem>,
+pub(crate) struct PerformanceDecl {
+	pub(crate) role_name: RoleName,
+	pub(crate) handlers: Vec<FunctionItem>,
 }
 
 impl PerformanceDecl {
-	pub fn new(role_name: Path, imp: ItemImpl) -> Result<PerformanceDecl> {
+	pub(crate) fn new(role_name: Path, imp: ItemImpl) -> Result<PerformanceDecl> {
 		assert!(!role_name.segments.is_empty());
 
 		let handlers = filter_unwrap!(imp.items, ImplItem::Fn).collect_vec();
@@ -39,12 +39,12 @@ impl PerformanceDecl {
 		})
 	}
 
-	pub fn get_role_name(&self) -> &RoleName {
+	pub(crate) fn get_role_name(&self) -> &RoleName {
 		&self.role_name
 	}
 }
 
-pub fn make_variant_name(function: &ImplItemFn) -> Ident {
+pub(crate) fn make_variant_name(function: &ImplItemFn) -> Ident {
 	let name = function.sig.ident.to_string();
 	format_ident!("{}", name.to_case(Case::UpperCamel))
 }

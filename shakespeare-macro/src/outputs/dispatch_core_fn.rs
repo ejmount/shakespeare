@@ -6,12 +6,12 @@ use crate::declarations::performance::make_variant_name;
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
 #[derive(Debug)]
-pub struct DispatchFunction {
+pub(crate) struct DispatchFunction {
 	fun: ItemImpl,
 }
 
 impl DispatchFunction {
-	pub fn new(
+	pub(crate) fn new(
 		data_name: &DataName,
 		role_name: &RoleName,
 		payload_type: &PayloadPath,
