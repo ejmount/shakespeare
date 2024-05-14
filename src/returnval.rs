@@ -11,7 +11,7 @@ use std::task::{Context, Poll};
 
 use futures::{pin_mut, Future, FutureExt};
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::oneshot::Sender;
+use tokio::sync::oneshot::{Receiver, Sender};
 
 use crate::{add_future, Role};
 
@@ -32,7 +32,7 @@ pub enum ReturnPath<Payload: Send> {
 }
 
 impl<Payload: Send> ReturnPath<Payload> {
-	pub fn create_immediate() -> (ReturnPath<Payload>, tokio::sync::oneshot::Receiver<Payload>) {
+	pub(crate) fn create_immediate() -> (ReturnPath<Payload>, Receiver<Payload>) {
 		let (send, recv) = tokio::sync::oneshot::channel();
 		(ReturnPath::Immediate(send), recv)
 	}

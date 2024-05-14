@@ -11,7 +11,7 @@ use crate::outputs::self_getter::SelfGetter;
 use crate::outputs::spawning_function::SpawningFunction;
 
 #[derive(Debug)]
-pub struct ActorOutput {
+pub(crate) struct ActorOutput {
 	data_item:         DataItem,
 	actor_struct:      ActorStruct,
 	getter:            SelfGetter,
@@ -24,7 +24,7 @@ pub struct ActorOutput {
 }
 
 impl ActorOutput {
-	pub fn new(actor_node: ActorDecl) -> Result<ActorOutput> {
+	pub(crate) fn new(actor_node: ActorDecl) -> Result<ActorOutput> {
 		let actor_struct = ActorStruct::new(&actor_node)?;
 
 		let ActorDecl {

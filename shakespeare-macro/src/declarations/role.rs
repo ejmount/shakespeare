@@ -1,13 +1,13 @@
 use syn::{Path, Signature, Visibility};
 
-pub struct RoleDecl {
-	pub name:       Path,
-	pub vis:        Visibility,
-	pub signatures: Vec<Signature>,
+pub(crate) struct RoleDecl {
+	pub(crate) name: Path,
+	pub(crate) vis: Visibility,
+	pub(crate) signatures: Vec<Signature>,
 }
 
 impl RoleDecl {
-	pub fn new(
+	pub(crate) fn new(
 		name: Path,
 		vis: Visibility,
 		signatures: impl Iterator<Item = Signature>,

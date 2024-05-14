@@ -4,16 +4,16 @@ use syn::Path;
 use super::ActorName;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataName(pub Path);
+pub(crate) struct DataName(Path);
 
 impl DataName {
-	pub fn new(p: Path) -> Self {
+	pub(crate) fn new(p: Path) -> Self {
 		debug_assert!(!p.segments.is_empty());
 		Self(p)
 	}
 
-	pub fn actor_path(&self) -> ActorName {
-		ActorName(super::update_path_leaf(self.0.clone(), |data_name| {
+	pub(crate) fn actor_path(&self) -> ActorName {
+		ActorName::new(super::update_path_leaf(self.0.clone(), |data_name| {
 			format_ident!("{}Actor", data_name)
 		}))
 	}

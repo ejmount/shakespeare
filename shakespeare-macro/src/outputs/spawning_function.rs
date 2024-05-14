@@ -9,12 +9,12 @@ use crate::declarations::performance::PerformanceDecl;
 use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
-pub struct SpawningFunction {
+pub(crate) struct SpawningFunction {
 	fun: ItemImpl,
 }
 
 impl SpawningFunction {
-	pub fn new(
+	pub(crate) fn new(
 		actor_name: &ActorName,
 		data_name: &DataName,
 		performances: &[PerformanceDecl],
