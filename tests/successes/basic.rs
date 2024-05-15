@@ -37,7 +37,7 @@ async fn main() {
 	let olaf = ActorState {
 		sender: Dropper(sender),
 	};
-	let shakespeare::ActorSpawn { actor, .. } = ActorState::start(olaf);
+	let shakespeare::ActorSpawn { actor, .. } = Actor::start(olaf);
 	let f = actor.speak(40);
 	f.await.unwrap();
 	assert_eq!(recv.recv().await.unwrap(), 40);

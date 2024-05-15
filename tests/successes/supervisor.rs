@@ -19,21 +19,21 @@ pub mod Supervisor {
 	#[performance(canonical)]
 	impl Starter for SupervisorState {
 		fn go(&mut self) {
-			let ActorSpawn { actor, handle, .. } = WorkerState::start(WorkerState {
+			let ActorSpawn { actor, handle, .. } = Worker::start(WorkerState {
 				success: true,
 				count:   0,
 			});
 			add_future::<dyn Listening, _>(Self::get_shell(), handle);
 			actor.work().await.unwrap();
 
-			let ActorSpawn { actor, handle, .. } = WorkerState::start(WorkerState {
+			let ActorSpawn { actor, handle, .. } = Worker::start(WorkerState {
 				success: false,
 				count:   0,
 			});
 			add_future::<dyn Listening, _>(Self::get_shell(), handle);
 			actor.work().await.unwrap();
 
-			let ActorSpawn { actor, handle, .. } = WorkerState::start(WorkerState {
+			let ActorSpawn { actor, handle, .. } = Worker::start(WorkerState {
 				success: true,
 				count:   0,
 			});
