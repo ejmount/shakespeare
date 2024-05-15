@@ -37,7 +37,7 @@ pub async fn main() {
 	}
 	use actor::Foo;
 	use shakespeare::ActorSpawn;
-	let ActorSpawn { actor, .. } = crate::successes::modules::actor::Foo::start(Foo {});
+	let ActorSpawn { actor, .. } = crate::successes::modules::actor::FooActor::start(Foo {});
 	let ptr = cast(actor);
 	ptr.handler().await.unwrap();
 }

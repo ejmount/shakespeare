@@ -22,7 +22,7 @@ mod Actor {
 
 #[tokio::test]
 async fn main() {
-	let shakespeare::ActorSpawn { actor, .. } = ActorState::start(ActorState { active: false });
+	let shakespeare::ActorSpawn { actor, .. } = Actor::start(ActorState { active: false });
 
 	let actor: std::sync::Arc<dyn BasicRole> = actor;
 

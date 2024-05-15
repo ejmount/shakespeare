@@ -87,7 +87,7 @@ impl SpawningFunction {
 		let getter_name = actor_name.get_static_item_name();
 
 		let fun: ItemImpl = fallible_quote! {
-			impl #data_name {
+			impl #actor_name {
 				pub fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
 					use ::shakespeare::{ActorSpawn, Channel, RoleReceiver, catch_future};
 					use ::std::sync::Arc;
@@ -109,6 +109,7 @@ impl SpawningFunction {
 								select! {
 									#(#select_branches),*
 									_ = &mut timeout_sleep, if outstanding_clients > 1 => {
+										let outstanding_clients = #getter_name.with(Arc::strong_count);
 										if outstanding_clients == 1 {
 											break;
 										}
