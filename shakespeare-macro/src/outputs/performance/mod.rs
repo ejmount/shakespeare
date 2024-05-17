@@ -1,13 +1,16 @@
+mod actor_role_perf;
+mod dispatch_core_fn;
+
+use actor_role_perf::ActorPerf;
+use dispatch_core_fn::DispatchFunction;
 use quote::ToTokens;
 use syn::Result;
 
-use super::actor_role_perf::ActorPerf;
-use super::dispatch_core_fn::DispatchFunction;
 use crate::data::{ActorName, DataName};
-use crate::declarations::performance::PerformanceDecl;
+use crate::declarations::PerformanceDecl;
 #[derive(Debug)]
 pub(crate) struct PerfDispatch {
-	actor_impl: ActorPerf,
+	actor_impl:  ActorPerf,
 	dispatch_fn: DispatchFunction,
 }
 
@@ -28,7 +31,7 @@ impl PerfDispatch {
 			Ok(None)
 		} else {
 			Ok(PerfDispatch {
-				actor_impl: ActorPerf::new(
+				actor_impl:  ActorPerf::new(
 					actor_path,
 					&payload_type,
 					&return_payload_type,

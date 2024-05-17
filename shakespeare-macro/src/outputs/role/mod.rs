@@ -1,13 +1,14 @@
+mod payload_enum;
+
+use payload_enum::{PayloadEnum, ReturnPayload};
 use quote::ToTokens;
 use syn::fold::Fold;
 use syn::{ItemImpl, ItemTrait, Result};
 
-use super::payload_enum::ReturnPayload;
 use crate::data::RoleName;
-use crate::declarations::role::RoleDecl;
+use crate::declarations::RoleDecl;
 use crate::interfacerewriter::InterfaceRewriter;
 use crate::macros::fallible_quote;
-use crate::outputs::payload_enum::PayloadEnum;
 
 #[derive(Debug)]
 pub(crate) struct RoleOutput {

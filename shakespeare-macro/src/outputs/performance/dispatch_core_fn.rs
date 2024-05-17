@@ -2,7 +2,7 @@ use quote::ToTokens;
 use syn::{Arm, Expr, FnArg, ItemImpl, Path, Result};
 
 use crate::data::{DataName, FunctionItem, MethodName, PayloadPath, RoleName};
-use crate::declarations::performance::make_variant_name;
+use crate::declarations::make_variant_name;
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
 #[derive(Debug)]
@@ -57,9 +57,6 @@ fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) 
 	let into_call: Expr = fallible_quote! {
 			<dyn #role_name as ::shakespeare::Role>::Return::#variant_name({ #body })
 	}?;
-	/*} else {
-		fallible_quote! { {#body}; }?
-	};*/
 
 	fallible_quote! {
 		#payload_type::#variant_name ((#(#patterns),*)) => { #into_call }
