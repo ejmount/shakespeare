@@ -13,6 +13,7 @@ use futures::{pin_mut, Future, FutureExt};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::{Receiver, Sender};
 
+use crate::core::ReceiverRole;
 use crate::{add_future, Role};
 
 #[derive(Debug)]
@@ -23,37 +24,44 @@ impl<T> Drop for Dropper<T> {
 	}
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub enum ReturnPath<Payload: Send> {
 	#[default]
 	Discard,
-	//Mailbox(Arc<R>),
+	Mailbox(Arc<dyn ReceiverRole<Payload>>),
 	Immediate(Sender<Payload>),
 }
 
-impl<Payload: Send> ReturnPath<Payload> {
+impl<Payload: Send + 'static> ReturnPath<Payload> {
 	pub(crate) fn create_immediate() -> (ReturnPath<Payload>, Receiver<Payload>) {
 		let (send, recv) = tokio::sync::oneshot::channel();
 		(ReturnPath::Immediate(send), recv)
 	}
 
 	pub async fn send(self, val: Payload) {
-		use ReturnPath::{Discard, Immediate};
+		use ReturnPath::{Discard, Immediate, Mailbox};
 
 		println!("Sending return... ",);
 		//dbg! {&val};
 
 		match self {
-			Discard => Ok(()),
-			//Mailbox(channel) => channel.send(val).await.map_err(drop),
-			Immediate(channel) => channel.send(val).map_err(drop),
-			_ => unimplemented!(),
+			Discard => (),
+			Mailbox(dest_actor) => {
+				let _ = dest_actor.enqueue(val).await;
+			}
+			Immediate(channel) => {
+				let _ = channel.send(val).map_err(drop);
+			}
 		};
 	}
 }
 
 #[derive(Debug)]
-pub struct Envelope<R: Role + ?Sized, V: TryFrom<R::Return>> {
+pub struct Envelope<R, V>
+where
+	R: Role + ?Sized,
+	V: TryFrom<R::Return>,
+{
 	val:  Option<R::Payload>,
 	dest: Option<Arc<R>>,
 	_v:   PhantomData<V>,
@@ -68,7 +76,7 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> Envelope<R, V> {
 		}
 	}
 
-	fn unpack(mut self) -> (R::Payload, Arc<R>) {
+	pub(crate) fn unpack(mut self) -> (R::Payload, Arc<R>) {
 		let val = (self.val.take().unwrap(), self.dest.take().unwrap());
 		std::mem::forget(self);
 		val
@@ -95,7 +103,7 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> IntoFuture for Envelope<R, V> {
 
 		let (return_path, rx) = ReturnPath::create_immediate();
 
-		let envelope = ReturnEnvelope {
+		let envelope: ReturnEnvelope<R> = ReturnEnvelope {
 			payload,
 			return_path,
 		};

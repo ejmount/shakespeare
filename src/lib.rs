@@ -11,6 +11,7 @@
 #![warn(clippy::todo)]
 #![warn(clippy::unimplemented)]
 
+use core::ReceiverRole;
 use std::any::Any;
 use std::future::Future;
 use std::sync::Arc;
@@ -51,8 +52,6 @@ where
 	futures::future::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(fut))
 }
 
-#[allow(clippy::pedantic)]
-#[allow(unused)]
 pub fn add_stream<R, S>(actor: Arc<R>, stream: S)
 where
 	R: Role + ?Sized,
@@ -69,14 +68,12 @@ where
 					payload,
 					return_path: returnval::ReturnPath::Discard,
 				};
-				actor.enqueue(envelope).await;
+				let _ = actor.enqueue(envelope).await;
 			})
 			.await;
 	});
 }
 
-#[allow(clippy::pedantic)]
-#[allow(unused)]
 pub fn add_future<R, F>(actor: Arc<R>, fut: F)
 where
 	R: Role + ?Sized,
@@ -90,6 +87,28 @@ where
 			payload,
 			return_path: returnval::ReturnPath::Discard,
 		};
-		actor.enqueue(envelope).await;
+		let _ = actor.enqueue(envelope).await;
 	});
+}
+
+pub async fn listen_for<R, Sender, RetType>(
+	actor: Arc<R>,
+	env: Envelope<Sender, RetType>,
+) -> Result<(), Role2SendError<Sender>>
+where
+	R: Role<Payload = Sender::Return>,
+	R: RoleReceiver<RetType>,
+	Sender: Role,
+	RetType: Send + 'static + TryFrom<Sender::Return>,
+{
+	let (payload, original) = env.unpack();
+
+	let receiver: Arc<dyn ReceiverRole<Sender::Return>> = actor;
+
+	let val: ReturnEnvelope<Sender> = ReturnEnvelope {
+		return_path: returnval::ReturnPath::Mailbox(receiver),
+		payload,
+	};
+
+	original.enqueue(val).await
 }
