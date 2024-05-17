@@ -18,19 +18,14 @@ mod interfacerewriter;
 mod macros;
 mod outputs;
 
+use data::DataName;
+use declarations::{ActorDecl, PerformanceDecl, RoleDecl};
+use macros::filter_unwrap;
+use outputs::{ActorOutput, PerfDispatch, RoleOutput};
 use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::parse::Parse;
 use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem};
-
-use crate::data::DataName;
-use crate::declarations::actor::ActorDecl;
-use crate::declarations::performance::PerformanceDecl;
-use crate::declarations::role::RoleDecl;
-use crate::macros::filter_unwrap;
-use crate::outputs::actor::ActorOutput;
-use crate::outputs::perfdispatch::PerfDispatch;
-use crate::outputs::role::RoleOutput;
 
 #[cfg_attr(not(proc_macro), visibility::make(pub))]
 fn make_actor(module: ItemMod) -> Result<ActorOutput> {

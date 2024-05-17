@@ -3,7 +3,7 @@ use quote::ToTokens;
 use syn::{FnArg, ItemImpl, Path, Result, ReturnType, Signature};
 
 use crate::data::{ActorName, FunctionItem, RoleName};
-use crate::declarations::performance::make_variant_name;
+use crate::declarations::make_variant_name;
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
 #[derive(Debug)]
@@ -24,12 +24,6 @@ impl ActorPerf {
 			fun,
 			role_name
 		));
-
-		//let mut rewriter = InterfaceRewriter::new(role_name);
-		/*let sending_methods = sending_methods
-		.into_iter()
-		.map(|i| rewriter.fold_impl_item_fn(i))
-		.collect_vec();*/
 
 		let sender_name = role_name.sender_method_name();
 

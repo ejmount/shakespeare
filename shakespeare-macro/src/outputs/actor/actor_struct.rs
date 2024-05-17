@@ -4,8 +4,7 @@ use syn::parse::Parser;
 use syn::{Field, ImplItemFn, ItemFn, ItemImpl, ItemStruct, Path, Result, Visibility};
 
 use crate::data::{ActorName, RoleName};
-use crate::declarations::actor::ActorDecl;
-use crate::declarations::performance::PerformanceDecl;
+use crate::declarations::{ActorDecl, PerformanceDecl};
 use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]

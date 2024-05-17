@@ -1,14 +1,19 @@
 use quote::ToTokens;
 use syn::{Item, ItemFn, Result};
 
+mod actor_struct;
+mod self_getter;
+mod spawning_function;
+
+use actor_struct::ActorStruct;
+use self_getter::SelfGetter;
+use spawning_function::SpawningFunction;
+
+use super::performance::PerfDispatch;
+use super::role::RoleOutput;
 use crate::data::DataItem;
-use crate::declarations::actor::ActorDecl;
+use crate::declarations::ActorDecl;
 use crate::macros::map_or_bail;
-use crate::outputs::actor_struct::ActorStruct;
-use crate::outputs::perfdispatch::PerfDispatch;
-use crate::outputs::role::RoleOutput;
-use crate::outputs::self_getter::SelfGetter;
-use crate::outputs::spawning_function::SpawningFunction;
 
 #[derive(Debug)]
 pub(crate) struct ActorOutput {
