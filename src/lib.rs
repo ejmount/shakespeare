@@ -1,6 +1,7 @@
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
 //#![warn(missing_docs)]
+#![warn(unreachable_pub)]
 #![warn(unused)]
 #![warn(nonstandard_style)]
 #![warn(clippy::pedantic)]
@@ -11,7 +12,6 @@
 #![warn(clippy::todo)]
 #![warn(clippy::unimplemented)]
 
-use core::ReceiverRole;
 use std::any::Any;
 use std::future::Future;
 use std::sync::Arc;
@@ -90,20 +90,20 @@ where
 		let _ = actor.enqueue(envelope).await;
 	});
 }
-
-pub async fn listen_for<R, Sender, RetType>(
+/*
+pub async fn send_to<R, P, Sender, RetType>(
 	actor: Arc<R>,
 	env: Envelope<Sender, RetType>,
 ) -> Result<(), Role2SendError<Sender>>
 where
-	R: Role<Payload = Sender::Return>,
-	R: RoleReceiver<RetType>,
+	R: Role<Payload = P> + Debug,
 	Sender: Role,
+	P: TryInto<RetType> + Send + 'static,
 	RetType: Send + 'static + TryFrom<Sender::Return>,
 {
 	let (payload, original) = env.unpack();
 
-	let receiver: Arc<dyn ReceiverRole<Sender::Return>> = actor;
+	let receiver: Arc<dyn ReceiverRole<_>> = actor;
 
 	let val: ReturnEnvelope<Sender> = ReturnEnvelope {
 		return_path: returnval::ReturnPath::Mailbox(receiver),
@@ -112,3 +112,4 @@ where
 
 	original.enqueue(val).await
 }
+ */
