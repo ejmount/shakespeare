@@ -1,34 +1,21 @@
-#![allow(unused)]
-#![allow(warnings)]
-
 use std::fmt::Debug;
 use std::future::IntoFuture;
 use std::marker::PhantomData;
-use std::ops::Deref;
 use std::pin::{pin, Pin};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use futures::{pin_mut, Future, FutureExt};
+use futures::Future;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::{Receiver, Sender};
 
-use crate::core::ReceiverRole;
 use crate::{add_future, Role};
 
-#[derive(Debug)]
-struct Dropper<T>(T);
-impl<T> Drop for Dropper<T> {
-	fn drop(&mut self) {
-		println!("Goodbye to the sender")
-	}
-}
-
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub enum ReturnPath<Payload: Send> {
 	#[default]
 	Discard,
-	Mailbox(Arc<dyn ReceiverRole<Payload>>),
+	//Mailbox(Arc<dyn ReceiverRole<Payload>>),
 	Immediate(Sender<Payload>),
 }
 
@@ -39,16 +26,15 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 	}
 
 	pub async fn send(self, val: Payload) {
-		use ReturnPath::{Discard, Immediate, Mailbox};
+		use ReturnPath::{Discard, Immediate};
 
 		println!("Sending return... ",);
-		//dbg! {&val};
 
 		match self {
 			Discard => (),
-			Mailbox(dest_actor) => {
-				let _ = dest_actor.enqueue(val).await;
-			}
+			/*Mailbox(dest_actor) => {
+				dest_actor.enqueue(val).await;
+			}*/
 			Immediate(channel) => {
 				let _ = channel.send(val).map_err(drop);
 			}
@@ -72,7 +58,7 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> Envelope<R, V> {
 		Envelope {
 			val:  Some(val.into()),
 			dest: Some(dest),
-			_v:   PhantomData::default(),
+			_v:   PhantomData {},
 		}
 	}
 
@@ -89,7 +75,7 @@ impl<R: Role + ?Sized> Envelope<R, R::Return> {
 		Envelope {
 			val:  Some(val),
 			dest: Some(dest),
-			_v:   PhantomData::default(),
+			_v:   PhantomData {},
 		}
 	}
 }
@@ -109,10 +95,10 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> IntoFuture for Envelope<R, V> {
 		};
 
 		tokio::spawn(async move {
-			dest.enqueue(envelope).await;
+			let _ = dest.enqueue(envelope).await;
 		});
 
-		ReturnCaster(rx.into_future(), PhantomData::default())
+		ReturnCaster(rx.into_future(), PhantomData {})
 	}
 }
 
@@ -125,16 +111,19 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> Drop for Envelope<R, V> {
 	}
 }
 
+#[allow(missing_debug_implementations)]
 #[pin_project::pin_project]
-pub struct ReturnCaster<R: Role + ?Sized, V>(
+pub struct ReturnCaster<R, V>(
 	#[pin] <tokio::sync::oneshot::Receiver<<R as crate::Role>::Return> as IntoFuture>::IntoFuture,
 	PhantomData<V>,
-);
+)
+where
+	R: Role + ?Sized;
 
 impl<R: Role + ?Sized, V: TryFrom<R::Return>> Future for ReturnCaster<R, V> {
 	type Output = std::result::Result<V, RecvError>;
 
-	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let inner = self.project().0;
 
 		match inner.poll(cx) {
@@ -150,6 +139,7 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> Future for ReturnCaster<R, V> {
 	}
 }
 
+#[derive(Debug)]
 pub struct ReturnEnvelope<R: Role + ?Sized> {
 	pub payload:     R::Payload,
 	pub return_path: ReturnPath<R::Return>,

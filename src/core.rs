@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use futures::Future;
 use tokio::task::JoinHandle;
 
-use crate::returnval::ReturnEnvelope;
+use crate::returnval::{ReturnEnvelope, ReturnPath};
 use crate::Role2SendError;
 
 pub enum ActorOutcome<A: ActorShell> {
@@ -146,22 +146,24 @@ pub trait Role: 'static + Sync + Send {
 	async fn enqueue(&self, val: ReturnEnvelope<Self>) -> Result<(), Role2SendError<Self>>;
 }
 
-#[async_trait::async_trait]
-pub trait ReceiverRole<T: Send + 'static>: Sync + Send {
+/*#[async_trait::async_trait]
+pub trait ReceiverRole<T: Send + 'static>: Sync + Send + Debug {
 	async fn enqueue(&self, val: T);
 }
 
 #[async_trait::async_trait]
-impl<T: Send + 'static, S: Send + 'static, R> ReceiverRole<S> for R
+impl<T, S, R> ReceiverRole<S> for R
 where
-	R: Role<Payload = T>,
-	T: From<S>,
+	R: Role<Payload = T> + Debug,
+	S: Send + 'static,
+	T: From<S> + Send + 'static,
 {
 	async fn enqueue(&self, val: S) {
 		let val = ReturnEnvelope {
 			payload:     val.into(),
-			return_path: crate::returnval::ReturnPath::Discard,
+			return_path: ReturnPath::Discard,
 		};
 		let _ = <Self as Role>::enqueue(self, val).await;
 	}
 }
+*/
