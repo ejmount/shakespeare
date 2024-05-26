@@ -13,7 +13,7 @@ pub(crate) struct PerformanceAttribute {
 
 pub(crate) struct PerformanceDecl {
 	pub(crate) role_name: RoleName,
-	pub(crate) handlers: Vec<FunctionItem>,
+	pub(crate) handlers:  Vec<FunctionItem>,
 }
 
 impl PerformanceDecl {

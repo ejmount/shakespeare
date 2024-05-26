@@ -1,8 +1,8 @@
 use syn::{Path, Signature, Visibility};
 
 pub(crate) struct RoleDecl {
-	pub(crate) name: Path,
-	pub(crate) vis: Visibility,
+	pub(crate) name:       Path,
+	pub(crate) vis:        Visibility,
 	pub(crate) signatures: Vec<Signature>,
 }
 
