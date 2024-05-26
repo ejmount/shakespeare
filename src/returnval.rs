@@ -11,7 +11,7 @@ use tokio::sync::oneshot::{Receiver, Sender};
 
 use crate::{add_future, Role};
 
-type PinnedAction = Pin<Box<dyn Future<Output = ()>>>;
+type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
 
 #[derive(Default)]
 pub enum ReturnPath<Payload: Send> {
@@ -152,6 +152,20 @@ where
 					.unwrap_or_else(|_| unreachable!("Conversion error"))
 			})
 		})
+	}
+}
+
+impl<R, V> Debug for ReturnCaster<R, V>
+where
+	R: Role + ?Sized,
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"ReturnCaster<{}, {}>",
+			std::any::type_name::<R>(),
+			std::any::type_name::<V>()
+		)
 	}
 }
 

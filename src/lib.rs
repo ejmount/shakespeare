@@ -7,7 +7,6 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::missing_panics_doc)]
 #![warn(clippy::dbg_macro)]
-//#![warn(unused_crate_dependencies)]
 #![forbid(unsafe_code)]
 #![warn(clippy::todo)]
 #![warn(clippy::unimplemented)]
@@ -30,7 +29,8 @@ mod returnval;
 mod tokio;
 
 pub use core::{
-	ActorHandle, ActorOutcome, ActorShell, ActorSpawn, Channel, Role, RoleReceiver, RoleSender,
+	Channel, Handle as ActorHandle, Outcome as ActorOutcome, Receiver as RoleReceiver, Role,
+	Sender as RoleSender, Shell as ActorShell, Spawn as ActorSpawn,
 };
 
 use futures::Stream;
@@ -92,20 +92,19 @@ where
 	});
 }
 
-pub async fn send_to<R, P, Sender, RetType>(
+pub async fn send_to<R, Payload, Sender, RetType>(
 	actor: Arc<R>,
 	env: Envelope<Sender, RetType>,
 ) -> Result<(), Role2SendError<Sender>>
 where
-	R: Role<Payload = P>,
+	R: Role<Payload = Payload>,
 	Sender: Role,
-	P: TryFrom<Sender::Return> + Send + 'static,
+	Payload: TryFrom<Sender::Return> + Send + 'static,
 	RetType: Send + 'static + TryFrom<Sender::Return>,
 {
 	let (payload, original) = env.unpack();
 
-	let closure = |payload: Sender::Return| -> Pin<Box<dyn Future<Output = ()>>> {
-		let actor = actor;
+	let closure = |payload: Sender::Return| -> Pin<Box<dyn Future<Output = ()> + Send>> {
 		let discard_envelope = ReturnEnvelope {
 			return_path: returnval::ReturnPath::Discard,
 			payload:     payload.try_into().unwrap_or_else(|_| unreachable!()),
