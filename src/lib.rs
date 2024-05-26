@@ -14,6 +14,7 @@
 
 use std::any::Any;
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 #[doc(hidden)]
@@ -33,6 +34,7 @@ pub use core::{
 	ActorHandle, ActorOutcome, ActorShell, ActorSpawn, Channel, Role, RoleReceiver, RoleSender,
 };
 
+use futures::Stream;
 pub use returnval::{Envelope, ReturnEnvelope};
 
 #[doc(hidden)]
@@ -90,26 +92,34 @@ where
 		let _ = actor.enqueue(envelope).await;
 	});
 }
-/*
+
 pub async fn send_to<R, P, Sender, RetType>(
 	actor: Arc<R>,
 	env: Envelope<Sender, RetType>,
 ) -> Result<(), Role2SendError<Sender>>
 where
-	R: Role<Payload = P> + Debug,
+	R: Role<Payload = P>,
 	Sender: Role,
-	P: TryInto<RetType> + Send + 'static,
+	P: TryFrom<Sender::Return> + Send + 'static,
 	RetType: Send + 'static + TryFrom<Sender::Return>,
 {
 	let (payload, original) = env.unpack();
 
-	let receiver: Arc<dyn ReceiverRole<_>> = actor;
+	let closure = |payload: Sender::Return| -> Pin<Box<dyn Future<Output = ()>>> {
+		let actor = actor;
+		let discard_envelope = ReturnEnvelope {
+			return_path: returnval::ReturnPath::Discard,
+			payload:     payload.try_into().unwrap_or_else(|_| unreachable!()),
+		};
+		Box::pin(async move {
+			let _ = actor.enqueue(discard_envelope).await;
+		})
+	};
 
 	let val: ReturnEnvelope<Sender> = ReturnEnvelope {
-		return_path: returnval::ReturnPath::Mailbox(receiver),
+		return_path: returnval::ReturnPath::Mailbox(Box::new(closure)),
 		payload,
 	};
 
 	original.enqueue(val).await
 }
- */
