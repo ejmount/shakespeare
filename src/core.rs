@@ -145,25 +145,3 @@ pub trait Role: 'static + Sync + Send {
 	fn send(&self, val: Self::Payload);
 	async fn enqueue(&self, val: ReturnEnvelope<Self>) -> Result<(), Role2SendError<Self>>;
 }
-
-/*#[async_trait::async_trait]
-pub trait ReceiverRole<T: Send + 'static>: Sync + Send + Debug {
-	async fn enqueue(&self, val: T);
-}
-
-#[async_trait::async_trait]
-impl<T, S, R> ReceiverRole<S> for R
-where
-	R: Role<Payload = T> + Debug,
-	S: Send + 'static,
-	T: From<S> + Send + 'static,
-{
-	async fn enqueue(&self, val: S) {
-		let val = ReturnEnvelope {
-			payload:     val.into(),
-			return_path: ReturnPath::Discard,
-		};
-		let _ = <Self as Role>::enqueue(self, val).await;
-	}
-}
-*/

@@ -11,11 +11,13 @@ use tokio::sync::oneshot::{Receiver, Sender};
 
 use crate::{add_future, Role};
 
-#[derive(Debug, Default)]
+type PinnedAction = Pin<Box<dyn Future<Output = ()>>>;
+
+#[derive(Default)]
 pub enum ReturnPath<Payload: Send> {
 	#[default]
 	Discard,
-	//Mailbox(Arc<dyn ReceiverRole<Payload>>),
+	Mailbox(Box<dyn Send + FnOnce(Payload) -> PinnedAction>),
 	Immediate(Sender<Payload>),
 }
 
@@ -26,15 +28,13 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 	}
 
 	pub async fn send(self, val: Payload) {
-		use ReturnPath::{Discard, Immediate};
+		use ReturnPath::{Discard, Immediate, Mailbox};
 
 		println!("Sending return... ",);
 
 		match self {
 			Discard => (),
-			/*Mailbox(dest_actor) => {
-				dest_actor.enqueue(val).await;
-			}*/
+			Mailbox(callback) => callback(val).await,
 			Immediate(channel) => {
 				let _ = channel.send(val).map_err(drop);
 			}
