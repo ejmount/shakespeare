@@ -21,7 +21,6 @@ use std::sync::Arc;
 pub use ::async_trait as async_trait_export;
 #[doc(hidden)]
 pub use ::tokio as tokio_export;
-use futures::Stream;
 pub use shakespeare_macro::{actor, performance, role};
 #[doc(hidden)]
 pub use tokio::TokioUnbounded;

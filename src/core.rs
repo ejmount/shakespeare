@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use futures::Future;
 use tokio::task::JoinHandle;
 
-use crate::returnval::{ReturnEnvelope, ReturnPath};
+use crate::returnval::ReturnEnvelope;
 use crate::Role2SendError;
 
 pub enum ActorOutcome<A: ActorShell> {

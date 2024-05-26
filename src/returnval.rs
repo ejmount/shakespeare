@@ -21,6 +21,16 @@ pub enum ReturnPath<Payload: Send> {
 	Immediate(Sender<Payload>),
 }
 
+impl<Payload: Send> std::fmt::Debug for ReturnPath<Payload> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Discard => write!(f, "<ReturnPath::Discard>"),
+			Self::Mailbox(_) => write!(f, "<ReturnPath::Mailbox>"),
+			Self::Immediate(_) => write!(f, "<ReturnPath::Immediate>"),
+		}
+	}
+}
+
 impl<Payload: Send + 'static> ReturnPath<Payload> {
 	pub(crate) fn create_immediate() -> (ReturnPath<Payload>, Receiver<Payload>) {
 		let (send, recv) = tokio::sync::oneshot::channel();
@@ -98,7 +108,10 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> IntoFuture for Envelope<R, V> {
 			let _ = dest.enqueue(envelope).await;
 		});
 
-		ReturnCaster(rx.into_future(), PhantomData {})
+		ReturnCaster {
+			future: rx.into_future(),
+			typ:    PhantomData {},
+		}
 	}
 }
 
@@ -111,36 +124,44 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> Drop for Envelope<R, V> {
 	}
 }
 
-#[allow(missing_debug_implementations)]
+#[doc(hidden)]
 #[pin_project::pin_project]
-pub struct ReturnCaster<R, V>(
-	#[pin] <tokio::sync::oneshot::Receiver<<R as crate::Role>::Return> as IntoFuture>::IntoFuture,
-	PhantomData<V>,
-)
+pub struct ReturnCaster<R, V>
 where
-	R: Role + ?Sized;
+	R: Role + ?Sized,
+{
+	#[pin]
+	future: <Receiver<<R as crate::Role>::Return> as IntoFuture>::IntoFuture,
+	typ:    PhantomData<V>,
+}
 
-impl<R: Role + ?Sized, V: TryFrom<R::Return>> Future for ReturnCaster<R, V> {
+impl<R, V> Future for ReturnCaster<R, V>
+where
+	R: Role + ?Sized,
+	V: TryFrom<R::Return>,
+{
 	type Output = std::result::Result<V, RecvError>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		let inner = self.project().0;
+		let inner = self.project().future;
 
-		match inner.poll(cx) {
-			Poll::Pending => Poll::Pending,
-			Poll::Ready(val) => {
-				let new_val = val.map(|r| {
-					r.try_into()
-						.unwrap_or_else(|_| unreachable!("Conversion error"))
-				});
-				Poll::Ready(new_val)
-			}
-		}
+		inner.poll(cx).map(|val| {
+			val.map(|returned_payload| {
+				returned_payload
+					.try_into()
+					.unwrap_or_else(|_| unreachable!("Conversion error"))
+			})
+		})
 	}
 }
 
-#[derive(Debug)]
 pub struct ReturnEnvelope<R: Role + ?Sized> {
 	pub payload:     R::Payload,
 	pub return_path: ReturnPath<R::Return>,
+}
+
+impl<R: Role + ?Sized> Debug for ReturnEnvelope<R> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "<ReturnEnvelope>")
+	}
 }
