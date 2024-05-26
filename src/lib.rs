@@ -25,16 +25,15 @@ pub use shakespeare_macro::{actor, performance, role};
 pub use tokio::TokioUnbounded;
 
 mod core;
-mod returnval;
 mod tokio;
 
 pub use core::{
-	Channel, Handle as ActorHandle, Outcome as ActorOutcome, Receiver as RoleReceiver, Role,
-	Sender as RoleSender, Shell as ActorShell, Spawn as ActorSpawn,
+	Channel, Envelope, Handle as ActorHandle, Outcome as ActorOutcome, Receiver as RoleReceiver,
+	ReturnCaster, ReturnEnvelope, ReturnPath, Role, Sender as RoleSender, Shell as ActorShell,
+	Spawn as ActorSpawn,
 };
 
 use futures::Stream;
-pub use returnval::{Envelope, ReturnEnvelope};
 
 #[doc(hidden)]
 pub type Role2Payload<R> = <R as Role>::Payload;
@@ -67,7 +66,7 @@ where
 				let payload = msg.into();
 				let envelope = ReturnEnvelope {
 					payload,
-					return_path: returnval::ReturnPath::Discard,
+					return_path: ReturnPath::Discard,
 				};
 				let _ = actor.enqueue(envelope).await;
 			})
@@ -86,7 +85,7 @@ where
 		let payload = fut.await.into();
 		let envelope = ReturnEnvelope {
 			payload,
-			return_path: returnval::ReturnPath::Discard,
+			return_path: ReturnPath::Discard,
 		};
 		let _ = actor.enqueue(envelope).await;
 	});
@@ -106,7 +105,7 @@ where
 
 	let closure = |payload: Sender::Return| -> Pin<Box<dyn Future<Output = ()> + Send>> {
 		let discard_envelope = ReturnEnvelope {
-			return_path: returnval::ReturnPath::Discard,
+			return_path: ReturnPath::Discard,
 			payload:     payload.try_into().unwrap_or_else(|_| unreachable!()),
 		};
 		Box::pin(async move {
@@ -115,7 +114,7 @@ where
 	};
 
 	let val: ReturnEnvelope<Sender> = ReturnEnvelope {
-		return_path: returnval::ReturnPath::Mailbox(Box::new(closure)),
+		return_path: ReturnPath::Mailbox(Box::new(closure)),
 		payload,
 	};
 
