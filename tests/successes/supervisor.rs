@@ -100,7 +100,7 @@ pub mod Worker {
 
 #[tokio::test]
 async fn main() {
-	let ActorSpawn { actor, handle, .. } = SupervisorState::start(SupervisorState::default());
+	let ActorSpawn { actor, handle, .. } = Supervisor::start(SupervisorState::default());
 
 	let _ = actor.go().await;
 	drop(actor);

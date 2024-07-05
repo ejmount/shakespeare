@@ -24,7 +24,7 @@ pub mod Counter {
 
 #[tokio::test]
 async fn main() {
-	let ActorSpawn { actor, handle, .. } = Actor::start(ActorState::default());
+	let ActorSpawn { actor, handle, .. } = Counter::start(ActorState::default());
 
 	let counting: Arc<dyn Counting> = actor;
 
