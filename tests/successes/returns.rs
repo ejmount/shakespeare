@@ -22,9 +22,9 @@ mod Actor {
 
 #[tokio::test]
 async fn main() {
-	let shakespeare::ActorSpawn { actor, .. } = Actor::start(ActorState { active: false });
+	let shakespeare::ActorSpawn { msg_handle, .. } = Actor::start(ActorState { active: false });
 
-	let actor: std::sync::Arc<dyn BasicRole> = actor;
+	let actor: std::sync::Arc<dyn BasicRole> = msg_handle;
 
 	let inactive = actor.speak(40).await.unwrap();
 	assert_eq!(inactive, 0);

@@ -10,7 +10,7 @@ pub mod Counter {
 		count: usize,
 	}
 	#[performance(canonical)]
-	impl Counting for ActorState {
+	impl Counting for Counting {
 		fn sum(&mut self, val: usize) {
 			self.count += val;
 		}
@@ -24,12 +24,16 @@ pub mod Counter {
 
 #[tokio::test]
 async fn main() {
-	let ActorSpawn { actor, handle, .. } = Counter::start(ActorState::default());
+	let ActorSpawn {
+		msg_handle,
+		join_handle,
+		..
+	} = Counter::start(ActorState::default());
 
-	let counting: Arc<dyn Counting> = actor;
+	let counting: Arc<dyn Counting> = msg_handle;
 
 	let numbers = futures::stream::iter(0..10);
 	add_stream(counting, numbers);
 
-	assert!(handle.await == ActorOutcome::Exit(45));
+	assert!(join_handle.await == ActorOutcome::Exit(45));
 }

@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use crate::successes::modules::role::RoleTrait;
-
 fn do_a_thing() {}
 
 pub mod actor {
@@ -31,13 +29,8 @@ pub mod perf {
 
 #[tokio::test]
 pub async fn main() {
-	use crate::successes::modules::actor::FooActor;
-	fn cast(a: Arc<FooActor>) -> Arc<dyn RoleTrait> {
-		a
-	}
-	use actor::Foo;
 	use shakespeare::ActorSpawn;
-	let ActorSpawn { actor, .. } = crate::successes::modules::actor::FooActor::start(Foo {});
-	let ptr = cast(actor);
+	let ActorSpawn { msg_handle, .. } =
+	let ptr: Arc<dyn RoleTrait> = msg_handle;
 	ptr.handler().await.unwrap();
 }

@@ -111,7 +111,9 @@ impl ActorDecl {
 			handler.sig.ident = format_ident!("{}", s.to_case(Case::Snake));
 		}
 
-		assert!(!performances.is_empty(), "Empty perfs"); // Because [SpawningFunction] falls over otherwise
+		assert!(!performances.is_empty(), "Empty perfs");
+		// [SpawningFunction] might fall over otherwise
+		// And also doesn't make much sense
 
 		Ok(ActorDecl {
 			actor_name,

@@ -86,16 +86,18 @@ pub struct Spawn<A>
 where
 	A: Shell,
 {
-	pub actor:  Arc<A>,
-	pub handle: Handle<A>,
+	/// A handle for sending messages to the actor
+	pub msg_handle:  Arc<A>,
+	/// A future for awaiting the actor's completion
+	pub join_handle: Handle<A>,
 }
 
 impl<A: Shell> Spawn<A> {
 	#[doc(hidden)]
 	pub fn new(actor: Arc<A>, handle: JoinHandle<Result<A::ExitType, A::PanicType>>) -> Spawn<A> {
 		Spawn {
-			actor,
-			handle: Handle::new(handle),
+			msg_handle:  actor,
+			join_handle: Handle::new(handle),
 		}
 	}
 }

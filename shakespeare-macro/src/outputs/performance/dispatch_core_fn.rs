@@ -24,15 +24,12 @@ impl DispatchFunction {
 		let fun = fallible_quote! {
 			impl #data_name {
 				pub async fn #dispatch_method_name(&mut self, msg: ::shakespeare::ReturnEnvelope<dyn #role_name>)  {
-					let ::shakespeare::ReturnEnvelope { payload: msg, return_path } = msg;
+					let ::shakespeare::ReturnEnvelope { payload, return_path } = msg;
 
-					let return_val = match msg {
+					let return_val = match payload {
 						#(#arms),*
 					};
-					//todo!("Work out what this is supposed to do when the user is expecting a response but the return type is empty");
-					//if let Some(return_val) = return_val {
-						return_path.send(return_val).await;
-					//}
+					return_path.send(return_val).await;
 				}
 			}
 		}?;
