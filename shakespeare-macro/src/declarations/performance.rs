@@ -1,14 +1,15 @@
 use convert_case::{Case, Casing};
 use itertools::Itertools;
 use quote::format_ident;
+use structmeta::{Flag, StructMeta};
 use syn::{Error, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, Path, Result};
 
 use crate::data::{FunctionItem, RoleName};
 use crate::macros::filter_unwrap;
 
-#[derive(structmeta::StructMeta)]
+#[derive(StructMeta)]
 pub(crate) struct PerformanceAttribute {
-	pub(crate) canonical: structmeta::Flag,
+	pub(crate) canonical: Flag,
 }
 
 pub(crate) struct PerformanceDecl {

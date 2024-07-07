@@ -19,28 +19,40 @@ pub mod Supervisor {
 	#[performance(canonical)]
 	impl Starter for SupervisorState {
 		fn go(&mut self) {
-			let ActorSpawn { actor, handle, .. } = Worker::start(WorkerState {
+			let ActorSpawn {
+				msg_handle,
+				join_handle,
+				..
+			} = Worker::start(WorkerState {
 				success: true,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(Self::get_shell(), handle);
-			actor.work().await.unwrap();
+			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
+			msg_handle.work().await.unwrap();
 
-			let ActorSpawn { actor, handle, .. } = Worker::start(WorkerState {
+			let ActorSpawn {
+				msg_handle,
+				join_handle,
+				..
+			} = Worker::start(WorkerState {
 				success: false,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(Self::get_shell(), handle);
-			actor.work().await.unwrap();
+			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
+			msg_handle.work().await.unwrap();
 
-			let ActorSpawn { actor, handle, .. } = Worker::start(WorkerState {
+			let ActorSpawn {
+				msg_handle,
+				join_handle,
+				..
+			} = Worker::start(WorkerState {
 				success: true,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(Self::get_shell(), handle);
+			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
 
 			sleep(Duration::from_millis(500)).await;
-			drop(actor);
+			drop(msg_handle);
 		}
 	}
 
@@ -100,10 +112,14 @@ pub mod Worker {
 
 #[tokio::test]
 async fn main() {
-	let ActorSpawn { actor, handle, .. } = Supervisor::start(SupervisorState::default());
+	let ActorSpawn {
+		msg_handle,
+		join_handle,
+		..
+	} = Supervisor::start(SupervisorState::default());
 
-	let _ = actor.go().await;
-	drop(actor);
+	let _ = msg_handle.go().await;
+	drop(msg_handle);
 
-	assert_eq!(handle.await, ActorOutcome::Exit(true));
+	assert_eq!(join_handle.await, ActorOutcome::Exit(true));
 }
