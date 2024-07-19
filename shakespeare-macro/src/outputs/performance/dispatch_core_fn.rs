@@ -24,8 +24,12 @@ impl DispatchFunction {
 		let fun = fallible_quote! {
 			impl #data_name {
 				pub async fn #dispatch_method_name(&mut self, msg: ::shakespeare::ReturnEnvelope<dyn #role_name>)  {
+					#[allow(unused_variables)]
 					let ::shakespeare::ReturnEnvelope { payload, return_path } = msg;
 
+					#[allow(unused_variables)]
+					#[allow(unused_parens)]
+					#[allow(unreachable_code)]
 					let return_val = match payload {
 						#(#arms),*
 					};
@@ -52,7 +56,7 @@ fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) 
 	let body = &fun.block;
 
 	let into_call: Expr = fallible_quote! {
-			<dyn #role_name as ::shakespeare::Role>::Return::#variant_name({ #body })
+			<dyn #role_name as ::shakespeare::Role>::Return::#variant_name( #body )
 	}?;
 
 	fallible_quote! {

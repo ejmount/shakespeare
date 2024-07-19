@@ -1,5 +1,3 @@
-#![allow(clippy::style)]
-
 macro_rules! filter_unwrap {
 	($list:expr, $pat:path) => {
 		$list
