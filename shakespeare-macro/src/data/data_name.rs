@@ -1,21 +1,22 @@
-use quote::{format_ident, ToTokens};
-use syn::Path;
+use quote::ToTokens;
+use syn::{parse_quote, TypePath};
 
 use super::ActorName;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct DataName(Path);
+pub(crate) struct DataName(TypePath);
 
 impl DataName {
-	pub(crate) fn new(p: Path) -> Self {
-		debug_assert!(!p.segments.is_empty());
+	pub(crate) fn new(p: TypePath) -> Self {
+		debug_assert!(!p.path.segments.is_empty());
 		Self(p)
 	}
 
-	pub(crate) fn actor_path(&self) -> ActorName {
-		ActorName::new(super::update_path_leaf(self.0.clone(), |data_name| {
-			format_ident!("{}Actor", data_name)
-		}))
+	pub(crate) fn get_shell_type_path(&self) -> ActorName {
+		let path = &self.0;
+		ActorName::new(parse_quote! {
+			<#path as ::shakespeare::ActorState>::ShellType
+		})
 	}
 }
 

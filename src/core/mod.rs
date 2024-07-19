@@ -1,5 +1,5 @@
 mod actor;
-pub use actor::{Handle, Outcome, Shell, Spawn};
+pub use actor::{Handle, Outcome, Shell, Spawn, State};
 
 mod role;
 pub use role::{Channel, Receiver, Role, Sender};

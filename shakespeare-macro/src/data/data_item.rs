@@ -18,9 +18,12 @@ impl DataItem {
 			| DataItem::Union(ItemUnion { ident, .. }) => {
 				let seg = PathSegment::from(ident.clone());
 				let segments = std::iter::once(seg).collect();
-				DataName::new(Path {
-					segments,
-					leading_colon: None,
+				DataName::new(syn::TypePath {
+					qself: None,
+					path:  Path {
+						segments,
+						leading_colon: None,
+					},
 				})
 			}
 		}

@@ -41,10 +41,6 @@ impl RoleName {
 		let field_name = self.queue_name();
 		format_ident!("push_to_{field_name}")
 	}
-
-	pub(crate) fn sender_getter_name(&self) -> Ident {
-		format_ident!("get_{}_sender", self.path_leaf())
-	}
 }
 
 impl ToTokens for RoleName {
