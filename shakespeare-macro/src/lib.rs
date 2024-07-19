@@ -25,7 +25,7 @@ use outputs::{ActorOutput, PerfDispatch, RoleOutput};
 use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::parse::Parse;
-use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem};
+use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem, Type};
 
 #[cfg_attr(not(proc_macro), visibility::make(pub))]
 fn make_actor(module: ItemMod) -> Result<ActorOutput> {
@@ -43,7 +43,7 @@ fn make_performance(imp: ItemImpl) -> Result<PerfDispatch> {
 		));
 	};
 
-	let syn::Type::Path(typath) = &*imp.self_ty else {
+	let Type::Path(typath) = &*imp.self_ty else {
 		return Err(syn::Error::new_spanned(
 			&imp.self_ty,
 			"Unsupported self type in performance",

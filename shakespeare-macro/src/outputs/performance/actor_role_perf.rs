@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use quote::ToTokens;
-use syn::{FnArg, ItemImpl, Path, Result, ReturnType, Signature};
+use syn::{parse_quote, FnArg, ItemImpl, Path, Result, ReturnType, Signature};
 
 use crate::data::{ActorName, FunctionItem, RoleName};
 use crate::declarations::make_variant_name;
@@ -37,9 +37,6 @@ impl ActorPerf {
 				async fn enqueue(&self, val: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>{
 					self.#sender_name(val).await
 				}
-				//fn listen_for(&self, msg: ::shakespeare::Envelope<dyn #role_name>) {
-				//	unimplemented!()
-				//}
 			}
 		}?;
 
@@ -71,12 +68,13 @@ fn create_sending_method(
 	let return_type = if let ReturnType::Type(_, ret) = output {
 		*ret.clone()
 	} else {
-		fallible_quote!(())?
+		parse_quote!(())
 	};
 
 	let fn_block = fallible_quote! {
+		#[allow(unused_parens)]
+		#[allow(dead_code)]
 		fn #ident(&self, #(#params),*) -> ::shakespeare::Envelope<dyn #role_name, #return_type> {
-			use shakespeare::{RoleReceiver, RoleSender};
 			let msg = (#(#patterns),*);
 			let payload = #payload_type::#variant_name(msg);
 			self.send(payload).downcast()

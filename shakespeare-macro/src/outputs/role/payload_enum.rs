@@ -21,6 +21,7 @@ impl PayloadEnum {
 		let impls = Self::create_from_impls(payload_type, methods)?;
 
 		let definition = fallible_quote! {
+			#[allow(unused_parens)]
 			pub enum #payload_type { #(#variants),* }
 		}?;
 
@@ -94,6 +95,7 @@ impl ReturnPayload {
 		let impls = Self::create_output_from_impls(return_payload_type, methods)?;
 
 		let definition = fallible_quote! {
+			#[allow(unused_parens)]
 			pub enum #return_payload_type { #(#variants),* }
 		}?;
 
@@ -124,6 +126,7 @@ impl ReturnPayload {
 		fallible_quote! {
 			impl TryFrom<#payload_type> for #typ {
 				type Error = ();
+				#[allow(unreachable_patterns)]
 				fn try_from(value: #payload_type) -> ::std::result::Result<Self, Self::Error> {
 					match value {
 						#(|#payload_type::#idents(val)),* => Ok(val),

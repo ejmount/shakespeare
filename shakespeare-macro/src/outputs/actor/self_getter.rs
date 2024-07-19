@@ -23,7 +23,8 @@ impl SelfGetter {
 
 		let data_getter: Item = fallible_quote! {
 			impl #data_name {
-				pub fn get_shell() -> ::std::sync::Arc<#actor_name> {
+				#[allow(dead_code)]
+				pub fn get_shell(&self) -> ::std::sync::Arc<#actor_name> {
 					#getter_item.with(Clone::clone)
 				}
 			}

@@ -37,6 +37,7 @@ impl RoleOutput {
 
 		let trait_definition = fallible_quote! {
 			#[::shakespeare::async_trait_export::async_trait]
+			#[allow(dead_code)]
 			#vis trait #role_name: 'static + Send + Sync {
 				#(#signatures;)*
 				fn send(&self, val: #payload_type) -> ::shakespeare::Envelope<dyn #role_name, #return_payload_type>;
