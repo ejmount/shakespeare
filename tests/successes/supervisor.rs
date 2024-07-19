@@ -27,7 +27,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
+			add_future::<dyn Listening, _>(self.get_shell(), join_handle);
 			msg_handle.work().await.unwrap();
 
 			let ActorSpawn {
@@ -38,7 +38,7 @@ pub mod Supervisor {
 				success: false,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
+			add_future::<dyn Listening, _>(self.get_shell(), join_handle);
 			msg_handle.work().await.unwrap();
 
 			let ActorSpawn {
@@ -49,7 +49,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(Self::get_shell(), join_handle);
+			add_future::<dyn Listening, _>(self.get_shell(), join_handle);
 
 			sleep(Duration::from_millis(500)).await;
 			drop(msg_handle);
@@ -87,7 +87,7 @@ pub mod Worker {
 		async fn work(&mut self) {
 			self.count += 1;
 			let sleep = sleep(Duration::from_millis(50));
-			add_future::<dyn Sleeper, _>(Self::get_shell(), sleep);
+			add_future::<dyn Sleeper, _>(self.get_shell(), sleep);
 		}
 	}
 	#[performance(canonical)]

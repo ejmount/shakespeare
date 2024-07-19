@@ -49,11 +49,11 @@ fn make_performance(imp: ItemImpl) -> Result<PerfDispatch> {
 			"Unsupported self type in performance",
 		));
 	};
-	let data_name = DataName::new(typath.path.clone());
+
+	let data_name = DataName::new(typath.clone());
+	let actor_path = data_name.get_shell_type_path();
 
 	let decl = PerformanceDecl::new(role_name.clone(), imp)?;
-
-	let actor_path = data_name.actor_path();
 
 	match PerfDispatch::new(&decl, &actor_path, &data_name)? {
 		Some(pd) => Ok(pd),

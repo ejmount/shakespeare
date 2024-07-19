@@ -1,9 +1,11 @@
 use itertools::Itertools;
 use quote::{quote, ToTokens};
 use syn::parse::Parser;
-use syn::{Field, ImplItemFn, ItemFn, ItemImpl, ItemStruct, Path, Result, Visibility};
+use syn::{
+	Field, ImplItem, ItemFn, ItemImpl, ItemStruct, Result, ReturnType, Signature, Visibility,
+};
 
-use crate::data::{ActorName, RoleName};
+use crate::data::{ActorName, DataName, RoleName};
 use crate::declarations::{ActorDecl, PerformanceDecl};
 use crate::macros::{fallible_quote, map_or_bail};
 
@@ -11,7 +13,7 @@ use crate::macros::{fallible_quote, map_or_bail};
 pub(crate) struct ActorStruct {
 	strukt:                  ItemStruct,
 	sender_method_name_impl: ItemImpl,
-	meta_trait:              ItemImpl,
+	meta_traits:             [ItemImpl; 2],
 }
 
 impl ActorStruct {
@@ -22,10 +24,11 @@ impl ActorStruct {
 			actor_vis,
 			panic_handler,
 			exit_handler,
+			data_item,
 			..
 		} = actor;
 
-		let fields = map_or_bail!(performances, make_field_from_name);
+		let fields = map_or_bail!(performances, shell_field_from_performance);
 
 		let strukt = fallible_quote! {
 			#[derive(Clone)]
@@ -42,12 +45,13 @@ impl ActorStruct {
 
 		let sender_method_name_impl = create_inherent_impl(&role_names, actor_vis, actor_name)?;
 
-		let meta_trait = create_meta_trait_impl(panic_handler, exit_handler, actor_name)?;
+		let meta_trait =
+			create_meta_trait_impl(panic_handler, exit_handler, actor_name, &data_item.name())?;
 
 		Ok(ActorStruct {
 			strukt,
 			sender_method_name_impl,
-			meta_trait,
+			meta_traits: meta_trait,
 		})
 	}
 }
@@ -55,7 +59,7 @@ impl ActorStruct {
 impl ToTokens for ActorStruct {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.strukt.to_tokens(tokens);
-		self.meta_trait.to_tokens(tokens);
+		self.meta_traits.each_ref().map(|f| f.to_tokens(tokens));
 		self.sender_method_name_impl.to_tokens(tokens);
 	}
 }
@@ -64,30 +68,50 @@ fn create_meta_trait_impl(
 	panic_handler: &Option<ItemFn>,
 	exit_handler: &Option<ItemFn>,
 	actor_name: &ActorName,
-) -> Result<ItemImpl> {
-	let unit_type = fallible_quote!(()).unwrap();
-	let panic_type =
-		fallible_quote!(std::boxed::Box<dyn std::any::Any + std::marker::Send>).unwrap();
-	let panic_return = panic_handler.as_ref().map_or(&panic_type, |f| {
-		if let syn::ReturnType::Type(_, b) = &f.sig.output {
-			&**b
-		} else {
-			&unit_type
-		}
-	});
-	let exit_return = exit_handler.as_ref().map_or(&unit_type, |f| {
-		if let syn::ReturnType::Type(_, b) = &f.sig.output {
-			&**b
-		} else {
-			&unit_type
-		}
-	});
-	fallible_quote! {
+	data_name: &DataName,
+) -> Result<[ItemImpl; 2]> {
+	let unit_type = fallible_quote!(())?;
+	let panic_type = fallible_quote!(std::boxed::Box<dyn std::any::Any + std::marker::Send>)?;
+
+	let panic_return = match panic_handler.as_ref() {
+		Some(ItemFn {
+			sig: Signature {
+				output: ReturnType::Type(_, b),
+				..
+			},
+			..
+		}) => &**b,
+		Some(_) => &unit_type,
+		None => &panic_type,
+	};
+	let exit_return = if let Some(ItemFn {
+		sig: Signature {
+			output: ReturnType::Type(_, b),
+			..
+		},
+		..
+	}) = exit_handler.as_ref()
+	{
+		&**b
+	} else {
+		&unit_type
+	};
+
+	let actor_trait = fallible_quote! {
 		impl ::shakespeare::ActorShell for #actor_name {
+			type StateType = #data_name;
 			type ExitType = #exit_return;
 			type PanicType = #panic_return;
 		}
-	}
+	}?;
+
+	let state_trait = fallible_quote! {
+		impl ::shakespeare::ActorState for #data_name {
+			type ShellType = #actor_name;
+		}
+	}?;
+
+	Ok([actor_trait, state_trait])
 }
 
 fn create_inherent_impl(
@@ -95,44 +119,28 @@ fn create_inherent_impl(
 	actor_vis: &Visibility,
 	actor_name: &ActorName,
 ) -> Result<ItemImpl> {
-	fn sender_method_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
-		let error_path: Path = fallible_quote! { ::shakespeare::Role2SendError<dyn #role_name> }?;
-
+	let make_methods = |role_name: &&RoleName| -> Result<ImplItem> {
 		let field_name = role_name.queue_name();
-
-		let acccessor_name: syn::Ident = role_name.sender_method_name();
+		let acccessor_name = role_name.sender_method_name();
 
 		fallible_quote! {
-			#vis async fn #acccessor_name(&self, payload: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), #error_path>
+			#actor_vis async fn #acccessor_name(&self, payload: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>
 			{
 				self.#field_name.send(payload)
 			}
 		}
-	}
-	fn sender_getter_from_name(role_name: &RoleName, vis: &Visibility) -> Result<ImplItemFn> {
-		let field_name = role_name.queue_name();
-		let getter_name = role_name.sender_getter_name();
+	};
 
-		fallible_quote! {
-			#vis fn #getter_name(&self) -> &::shakespeare::Role2Sender<dyn #role_name>
-			{
-				&self.#field_name
-			}
-		}
-	}
+	let methods = map_or_bail!(role_names, make_methods);
 
-	let sender_method_names =
-		map_or_bail!(&role_names, |name| sender_method_from_name(name, actor_vis));
-	let getters = map_or_bail!(&role_names, |name| sender_getter_from_name(name, actor_vis));
 	fallible_quote! {
 		impl #actor_name {
-			#(#sender_method_names)*
-			#(#getters)*
+			#(#methods)*
 		}
 	}
 }
 
-fn make_field_from_name(perf: &PerformanceDecl) -> Result<Field> {
+fn shell_field_from_performance(perf: &PerformanceDecl) -> Result<Field> {
 	let role_name = &perf.role_name;
 	let field_name = role_name.queue_name();
 
