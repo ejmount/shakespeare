@@ -13,6 +13,7 @@ use crate::{add_future, Role};
 
 type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
 
+#[doc(hidden)]
 #[derive(Default)]
 pub enum ReturnPath<Payload: Send> {
 	#[default]
@@ -52,6 +53,14 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 	}
 }
 
+/// A message that has been prepared to be (*but not yet*) sent to an actor, produced by calling a method on the actor shell.
+///
+/// This type allows the caller to control how the return value produced by the actor processing the message will be handled. As a result, while this value exists the message has not been sent.
+///
+/// The caller is expected to do one of three things with this value:
+/// 1. nothing - that is, allowing it to drop will dispatch the message and have any return value thrown away
+/// 2. awaiting this value will yield the return value to the caller
+/// 3. calling [`send_to`][`crate::send_to`] will send the return value directly to another actor's mailbox.
 #[derive(Debug)]
 pub struct Envelope<R, V>
 where
@@ -63,7 +72,12 @@ where
 	_v:   PhantomData<V>,
 }
 
-impl<R: Role + ?Sized, V: TryFrom<R::Return>> Envelope<R, V> {
+impl<R, V> Envelope<R, V>
+where
+	R: Role + ?Sized,
+	V: TryFrom<R::Return>,
+{
+	#[doc(hidden)]
 	pub fn new(val: impl Into<R::Payload>, dest: Arc<R>) -> Envelope<R, V> {
 		Envelope {
 			val:  Some(val.into()),
@@ -79,7 +93,11 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> Envelope<R, V> {
 	}
 }
 
-impl<R: Role + ?Sized> Envelope<R, R::Return> {
+impl<R> Envelope<R, R::Return>
+where
+	R: Role + ?Sized,
+{
+	#[doc(hidden)]
 	pub fn downcast<V: TryFrom<R::Return>>(self) -> Envelope<R, V> {
 		let (val, dest) = self.unpack();
 		Envelope {
@@ -90,8 +108,14 @@ impl<R: Role + ?Sized> Envelope<R, R::Return> {
 	}
 }
 
-impl<R: Role + ?Sized, V: TryFrom<R::Return>> IntoFuture for Envelope<R, V> {
+impl<R, V> IntoFuture for Envelope<R, V>
+where
+	R: Role + ?Sized,
+	V: TryFrom<R::Return>,
+{
+	#[doc(hidden)]
 	type IntoFuture = ReturnCaster<R, V>;
+	/// The return received from the envelope can fail if the message handler doesn't complete
 	type Output = std::result::Result<V, RecvError>;
 
 	fn into_future(self) -> Self::IntoFuture {
@@ -126,6 +150,8 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> Drop for Envelope<R, V> {
 
 #[doc(hidden)]
 #[pin_project::pin_project]
+/// A future that awaits on an [`Envelope`] being processed and appropriately casts the return value
+/// This can fail and produce an `Err` if the actor's message handler aborts without completing.
 pub struct ReturnCaster<R, V>
 where
 	R: Role + ?Sized,
@@ -169,6 +195,7 @@ where
 	}
 }
 
+#[doc(hidden)]
 pub struct ReturnEnvelope<R: Role + ?Sized> {
 	pub payload:     R::Payload,
 	pub return_path: ReturnPath<R::Return>,

@@ -1,6 +1,7 @@
+//! Hello
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
-//#![warn(missing_docs)]
+#![warn(missing_docs)]
 #![warn(unreachable_pub)]
 #![warn(unused)]
 #![warn(nonstandard_style)]
@@ -81,6 +82,23 @@ fn parse_macro_input<T: Parse>(tokens: TokenStream) -> ::std::result::Result<T, 
 	syn::parse2(tokens).map_err(|err| TokenStream::from(err.to_compile_error()))
 }
 
+/// The starting point - defines a new actor type
+///
+/// This macro attaches to an inline `mod` block that must contain the following items:
+/// 1. exactly one `struct`, `enum` *or* `union` definition representing the actor's state type. Call this `S`
+/// 2. at least one [`performance`] block.
+///
+/// The `mod` can also optionally contain any of:
+/// 1. a function called `stop` that consumes a single `S` value and may return a value of any type. This function will be called when the actor drops.
+/// 2. a function called `catch` that consumes a `Box<dyn Any + Send>` and may return a value of any type. This function will be called if any of the actor's performances panic.
+///
+/// The macro then generates a new type with the same name as the module. This new type:
+/// 1. has a constructor function `start(state: S) -> ActorSpawn<Self>`
+/// 2. implements each role trait for which it has a performance.
+///
+/// The `ActorSpawn` contains an `Arc` that refers to the actor object. This value is the interface for sending the actor messages and controls its lifetime. When the last `Arc` goes out of scope, the actor will finish processing any messages it has already received, call its `stop` function if one exists, and then drop its state. If a method handler inside a performance panics, the `catch` function will be called *instead of* `stop`.
+///
+/// The `ActorSpawn` also contains a `Handle`, which is a future that will yield the value produced by the actor stopping, either successfully or by panic.
 #[proc_macro_attribute]
 pub fn actor(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	match parse_macro_input(item) {
@@ -92,6 +110,9 @@ pub fn actor(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	}
 }
 
+/// Defines an actor's implementation of a Role.
+///
+/// This macro applies is applided to an `impl` block naming the role being implemented
 #[proc_macro_attribute]
 pub fn performance(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	match parse_macro_input(item) {
@@ -103,6 +124,9 @@ pub fn performance(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	}
 }
 
+/// Defines an interface that an actor may implement.
+///
+/// This macro applies to a `trait` block, and works very similarly to conventional traits.
 #[proc_macro_attribute]
 pub fn role(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	match parse_macro_input(item) {

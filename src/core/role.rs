@@ -1,4 +1,7 @@
-use super::super::{ReturnEnvelope, Role2SendError};
+#![allow(missing_docs)]
+
+use super::super::Role2SendError;
+use super::returnval::ReturnEnvelope;
 
 #[doc(hidden)]
 #[trait_variant::make(Send)]
@@ -31,11 +34,16 @@ pub trait Channel {
 	}
 }
 
+/// Roles implement this trait, which describes the generic features all roles contain. See the [`role!`][`::shakespeare_macro::role`] macro for more information.
 #[trait_variant::make(Send)]
 pub trait Role: 'static + Sync + Send {
 	type Payload: Sized + Send;
 	type Return: Sized + Send;
+	#[doc(hidden)]
 	type Channel: Channel<Item = ReturnEnvelope<Self>>;
+	#[doc(hidden)]
+	/// This is sync because it creates a new task to send the message from
 	fn send(&self, val: Self::Payload);
+	#[doc(hidden)]
 	async fn enqueue(&self, val: ReturnEnvelope<Self>) -> Result<(), Role2SendError<Self>>;
 }
