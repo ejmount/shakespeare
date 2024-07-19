@@ -1,6 +1,8 @@
+//! Hello
+
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
-//#![warn(missing_docs)]
+#![warn(missing_docs)]
 #![warn(unreachable_pub)]
 #![warn(unused)]
 #![warn(nonstandard_style)]
@@ -27,10 +29,14 @@ pub use tokio::TokioUnbounded;
 mod core;
 mod tokio;
 
+#[doc(hidden)]
 pub use core::{
-	Channel, Envelope, Handle as ActorHandle, Outcome as ActorOutcome, Receiver as RoleReceiver,
-	ReturnCaster, ReturnEnvelope, ReturnPath, Role, Sender as RoleSender, Shell as ActorShell,
-	Spawn as ActorSpawn,
+	Channel, Receiver as RoleReceiver, ReturnCaster, ReturnEnvelope, ReturnPath,
+	Sender as RoleSender,
+};
+pub use core::{
+	Envelope, Handle as ActorHandle, Outcome as ActorOutcome, Role, Shell as ActorShell,
+	Spawn as ActorSpawn, State as ActorState,
 };
 
 use futures::Stream;
@@ -45,6 +51,9 @@ pub type Role2Sender<R> = <<R as Role>::Channel as Channel>::Sender;
 pub type Role2SendError<R> = <Role2Sender<R> as RoleSender<ReturnEnvelope<R>>>::Error;
 
 #[doc(hidden)]
+/// Create a new future that will wrap the given future and catch any panic.
+/// Used by [`::shakespeare_macro::actor::output::SpawningFunction`]
+/// Included here to avoid clients having to depend on `futures` crate
 pub fn catch_future<T>(fut: T) -> impl Future<Output = Result<T::Output, Box<dyn Any + Send>>>
 where
 	T: Future,
@@ -52,6 +61,13 @@ where
 	futures::future::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(fut))
 }
 
+/// Subscribes an actor to a stream, delivering each item of the stream to the actor's mailbox.
+///
+/// The type constraints ensure that it is unambigious which method handler this will dispatch to.
+///
+/// This function does not do anything to inform the actor when the stream closes, successfuly or otherwise.
+///
+/// **N.B**: this function retains the `Arc<dyn Role>` for as long as the stream is still active, and will keep the actor alive for that time.
 pub fn add_stream<R, S>(actor: Arc<R>, stream: S)
 where
 	R: Role + ?Sized,
@@ -74,6 +90,12 @@ where
 	});
 }
 
+/// Subscribes an actor to a future - the future's output will be delivered to the actor's mailbox when it resolves.
+/// The type constraints ensure that the actor has an unambigious interpretation of the incoming value.
+///
+/// See also [`add_stream`] if you have a stream of items to deliver rather than a single value.
+///
+/// **N.B**: this function retains the `Arc<dyn Role>` for as long as the future is pending, and will keep the actor alive for that time.
 pub fn add_future<R, F>(actor: Arc<R>, fut: F)
 where
 	R: Role + ?Sized,
@@ -91,12 +113,15 @@ where
 	});
 }
 
+/// Arranges for the *return value* produced by processing the given [`Envelope`] to be forwarded to the recipient actor.
+///
+/// Equivalent to, but more efficient than, passing the same parameters to [`add_future`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
 pub async fn send_to<R, Payload, Sender, RetType>(
-	actor: Arc<R>,
+	recipient: Arc<R>,
 	env: Envelope<Sender, RetType>,
 ) -> Result<(), Role2SendError<Sender>>
 where
-	R: Role<Payload = Payload>,
+	R: Role<Payload = Payload> + ?Sized,
 	Sender: Role,
 	Payload: TryFrom<Sender::Return> + Send + 'static,
 	RetType: Send + 'static + TryFrom<Sender::Return>,
@@ -109,7 +134,7 @@ where
 			payload:     payload.try_into().unwrap_or_else(|_| unreachable!()),
 		};
 		Box::pin(async move {
-			let _ = actor.enqueue(discard_envelope).await;
+			let _ = recipient.enqueue(discard_envelope).await;
 		})
 	};
 
