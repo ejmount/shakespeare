@@ -16,15 +16,14 @@ pub(crate) type FunctionItem = syn::ImplItemFn;
 pub(crate) type MethodName = Ident;
 pub(crate) type PayloadPath = Path;
 
-pub(crate) fn update_path_leaf<F>(mut p: Path, f: F) -> Path
+pub(crate) fn map_path_leaf<F>(mut p: Path, f: F) -> Path
 where
 	F: Fn(Ident) -> Ident,
 {
 	debug_assert!(!p.segments.is_empty());
 	let leaf = p.segments.pop().unwrap().into_value();
-	let i = leaf.ident;
 	let new_leaf = PathSegment {
-		ident: f(i),
+		ident: f(leaf.ident),
 		..leaf
 	};
 	p.segments.push(new_leaf);
