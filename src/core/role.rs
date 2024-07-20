@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use super::super::Role2SendError;
 use super::returnval::ReturnEnvelope;
 
@@ -41,9 +39,6 @@ pub trait Role: 'static + Sync + Send {
 	type Return: Sized + Send;
 	#[doc(hidden)]
 	type Channel: Channel<Item = ReturnEnvelope<Self>>;
-	#[doc(hidden)]
-	/// This is sync because it creates a new task to send the message from
-	fn send(&self, val: Self::Payload);
 	#[doc(hidden)]
 	async fn enqueue(&self, val: ReturnEnvelope<Self>) -> Result<(), Role2SendError<Self>>;
 }
