@@ -2,7 +2,7 @@ use convert_case::{Case, Casing};
 use itertools::Itertools;
 use quote::format_ident;
 use structmeta::{Flag, StructMeta};
-use syn::{Error, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, Path, Result};
+use syn::{Error, Generics, Ident, ImplItem, ItemImpl, Path, Result};
 
 use crate::data::{FunctionItem, RoleName};
 use crate::macros::filter_unwrap;
@@ -45,7 +45,7 @@ impl PerformanceDecl {
 	}
 }
 
-pub(crate) fn make_variant_name(function: &ImplItemFn) -> Ident {
+pub(crate) fn make_variant_name(function: &FunctionItem) -> Ident {
 	let name = function.sig.ident.to_string();
 	format_ident!("{}", name.to_case(Case::UpperCamel))
 }

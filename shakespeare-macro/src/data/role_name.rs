@@ -3,7 +3,7 @@ use proc_macro2::Ident;
 use quote::{format_ident, ToTokens};
 use syn::Path;
 
-use super::{update_path_leaf, MethodName};
+use super::{map_path_leaf, MethodName};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RoleName(Path);
@@ -28,13 +28,13 @@ impl RoleName {
 	}
 
 	pub(crate) fn payload_path(&self) -> syn::Path {
-		update_path_leaf(self.0.clone(), |data_name| {
+		map_path_leaf(self.0.clone(), |data_name| {
 			format_ident!("{}Payload", data_name)
 		})
 	}
 
 	pub(crate) fn return_payload_path(&self) -> syn::Path {
-		update_path_leaf(self.0.clone(), |p| format_ident!("{}ReturnPayload", p))
+		map_path_leaf(self.0.clone(), |p| format_ident!("{}ReturnPayload", p))
 	}
 
 	pub(crate) fn sender_method_name(&self) -> Ident {
