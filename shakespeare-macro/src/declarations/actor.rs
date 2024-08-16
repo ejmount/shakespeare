@@ -140,14 +140,18 @@ fn read_performance(item: &Item) -> Fallible<ActorInternal> {
 	let syn::Item::Impl(imp) = item else {
 		return Ok(None);
 	};
+
 	let Some(attr) = get_performance_tag(imp) else {
 		return Ok(None);
 	};
-	let arg: PerformanceAttribute = attr.parse_args()?;
-	let canonical = arg.canonical;
+
 	let role_name = &imp.trait_.as_ref().unwrap().1;
 	let perf = PerformanceDecl::new(role_name.clone(), imp.clone())?;
-	if canonical.value() {
+
+	let args: Option<PerformanceAttribute> = attr.parse_args().ok();
+	let canonical = args.map_or(false, |args| args.canonical.value());
+
+	if canonical {
 		let signatures = filter_unwrap!(imp.items.iter(), ImplItem::Fn)
 			.map(|f| &f.sig)
 			.cloned();
