@@ -6,7 +6,7 @@ pub mod actor {
 	#[shakespeare::actor]
 	pub mod FooActor {
 		pub struct FooState {}
-		#[shakespeare::performance()]
+		#[shakespeare::performance]
 		impl crate::successes::modules::role::RoleTrait for FooState {}
 	}
 }
