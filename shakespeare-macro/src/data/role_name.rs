@@ -1,9 +1,9 @@
 use convert_case::{Case, Casing};
 use proc_macro2::Ident;
 use quote::{format_ident, ToTokens};
-use syn::Path;
+use syn::{Path, PathSegment};
 
-use super::{map_path_leaf, MethodName};
+use super::MethodName;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RoleName(Path);
@@ -47,4 +47,18 @@ impl ToTokens for RoleName {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.0.to_tokens(tokens);
 	}
+}
+
+fn map_path_leaf<F>(mut p: Path, f: F) -> Path
+where
+	F: Fn(Ident) -> Ident,
+{
+	debug_assert!(!p.segments.is_empty());
+	let leaf = p.segments.pop().unwrap().into_value();
+	let new_leaf = PathSegment {
+		ident: f(leaf.ident),
+		..leaf
+	};
+	p.segments.push(new_leaf);
+	p
 }
