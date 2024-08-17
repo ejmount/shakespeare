@@ -6,6 +6,9 @@
 version: 2
 updates:
   - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/" # Location of package manifests
+    directories: # Location of package manifests
+    - "/"
+    - "shakespeare-macro"
+    - "xtask"
     schedule:
       interval: "weekly"
