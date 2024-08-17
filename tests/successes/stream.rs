@@ -1,16 +1,16 @@
 use std::any::Any;
 use std::sync::Arc;
 
-use shakespeare::{actor, add_stream, ActorOutcome, ActorSpawn};
+use shakespeare::{actor, send_stream_to, ActorOutcome, ActorSpawn};
 
 #[actor]
-pub mod Counter {
+pub mod CounterActor {
 	#[derive(Default)]
 	pub struct ActorState {
 		count: usize,
 	}
 	#[performance(canonical)]
-	impl Counting for Counting {
+	impl Counter for Counting {
 		fn sum(&mut self, val: usize) {
 			self.count += val;
 		}
@@ -28,12 +28,12 @@ async fn main() {
 		msg_handle,
 		join_handle,
 		..
-	} = Counter::start(ActorState::default());
+	} = CounterActor::start(ActorState::default());
 
-	let counting: Arc<dyn Counting> = msg_handle;
+	let counter: Arc<dyn Counter> = msg_handle;
 
 	let numbers = futures::stream::iter(0..10);
-	add_stream(counting, numbers);
+	send_stream_to(numbers, counter);
 
-	assert!(join_handle.await == ActorOutcome::Exit(45));
+	assert_eq!(join_handle.await, ActorOutcome::Exit(45));
 }

@@ -68,7 +68,7 @@ where
 /// This function does not do anything to inform the actor when the stream closes, successfuly or otherwise.
 ///
 /// **N.B**: this function retains the `Arc<dyn Role>` for as long as the stream is still active, and will keep the actor alive for that time.
-pub fn add_stream<R, S>(actor: Arc<R>, stream: S)
+pub fn send_stream_to<R, S>(stream: S, actor: Arc<R>)
 where
 	R: Role + ?Sized,
 	S: Stream + Send + 'static,
@@ -96,7 +96,7 @@ where
 /// See also [`add_stream`] if you have a stream of items to deliver rather than a single value.
 ///
 /// **N.B**: this function retains the `Arc<dyn Role>` for as long as the future is pending, and will keep the actor alive for that time.
-pub fn add_future<R, F>(actor: Arc<R>, fut: F)
+pub fn send_future_to<R, F>(fut: F, actor: Arc<R>)
 where
 	R: Role + ?Sized,
 	F: Future + Send + 'static,
@@ -117,8 +117,8 @@ where
 ///
 /// Equivalent to, but more efficient than, passing the same parameters to [`add_future`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
 pub async fn send_to<R, Payload, Sender, RetType>(
-	recipient: Arc<R>,
 	env: Envelope<Sender, RetType>,
+	recipient: Arc<R>,
 ) -> Result<(), Role2SendError<Sender>>
 where
 	R: Role<Payload = Payload> + ?Sized,
