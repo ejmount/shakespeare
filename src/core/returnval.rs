@@ -9,7 +9,7 @@ use futures::Future;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::{Receiver, Sender};
 
-use crate::{add_future, Role};
+use crate::{send_future_to, Role};
 
 type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
 
@@ -144,7 +144,7 @@ impl<R: Role + ?Sized, V: TryFrom<R::Return>> Drop for Envelope<R, V> {
 		let val = self.val.take().unwrap();
 		let dest = self.dest.take().unwrap();
 
-		add_future(dest, std::future::ready(val));
+		send_future_to(std::future::ready(val), dest);
 	}
 }
 

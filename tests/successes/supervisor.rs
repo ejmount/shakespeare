@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::time::Duration;
 
-use shakespeare::{actor, add_future, ActorOutcome, ActorSpawn};
+use shakespeare::{actor, send_future_to, ActorOutcome, ActorSpawn};
 use tokio::time::sleep;
 
 type Panic = Box<dyn Any + Send>;
@@ -27,7 +27,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(self.get_shell(), join_handle);
+			send_future_to::<dyn Listening, _>(join_handle, self.get_shell());
 			msg_handle.work().await.unwrap();
 
 			let ActorSpawn {
@@ -38,7 +38,7 @@ pub mod Supervisor {
 				success: false,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(self.get_shell(), join_handle);
+			send_future_to::<dyn Listening, _>(join_handle, self.get_shell());
 			msg_handle.work().await.unwrap();
 
 			let ActorSpawn {
@@ -49,7 +49,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			add_future::<dyn Listening, _>(self.get_shell(), join_handle);
+			send_future_to::<dyn Listening, _>(join_handle, self.get_shell());
 
 			sleep(Duration::from_millis(500)).await;
 			drop(msg_handle);
@@ -87,7 +87,7 @@ pub mod Worker {
 		async fn work(&mut self) {
 			self.count += 1;
 			let sleep = sleep(Duration::from_millis(50));
-			add_future::<dyn Sleeper, _>(self.get_shell(), sleep);
+			send_future_to::<dyn Sleeper, _>(sleep, self.get_shell());
 		}
 	}
 	#[performance(canonical)]
