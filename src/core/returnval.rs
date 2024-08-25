@@ -89,14 +89,10 @@ where
 		std::mem::forget(self);
 		val
 	}
-}
 
-impl<R> Envelope<R, R::Return>
-where
-	R: Role + ?Sized,
-{
 	#[doc(hidden)]
-	pub fn downcast<V: TryFrom<R::Return>>(self) -> Envelope<R, V> {
+	#[must_use]
+	pub fn downcast(self) -> Envelope<R, V> {
 		let (val, dest) = self.unpack();
 		Envelope {
 			val:  Some(val),
