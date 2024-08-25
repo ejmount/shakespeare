@@ -77,7 +77,7 @@ fn create_sending_method(
 		fn #ident(&self, #(#params),*) -> ::shakespeare::Envelope<dyn #role_name, #return_type> {
 			let msg = (#(#patterns),*);
 			let payload = #payload_type::#variant_name(msg);
-			<Self as #role_name>::send(&self, payload).downcast()
+			::shakespeare::Envelope::new(payload, self.get_shell())
 		}
 	}?;
 
