@@ -29,14 +29,14 @@ pub use tokio::TokioUnbounded;
 mod core;
 mod tokio;
 
+pub use core::{
+	Accepts, Emits, Envelope, Handle as ActorHandle, Outcome as ActorOutcome, Role,
+	Shell as ActorShell, Spawn as ActorSpawn, State as ActorState,
+};
 #[doc(hidden)]
 pub use core::{
 	Channel, Receiver as RoleReceiver, ReturnCaster, ReturnEnvelope, ReturnPath,
 	Sender as RoleSender,
-};
-pub use core::{
-	Envelope, Handle as ActorHandle, Outcome as ActorOutcome, Role, Shell as ActorShell,
-	Spawn as ActorSpawn, State as ActorState,
 };
 
 use futures::Stream;
@@ -70,16 +70,15 @@ where
 /// **N.B**: this function retains the `Arc<dyn Role>` for as long as the stream is still active, and will keep the actor alive for that time.
 pub fn send_stream_to<R, S>(stream: S, actor: Arc<R>)
 where
-	R: Role + ?Sized + 'static,
+	R: Accepts<S::Item> + ?Sized + 'static,
 	S: Stream + Send + 'static,
-	R::Payload: From<S::Item>,
 	<S as Stream>::Item: Send,
 {
 	use futures::StreamExt;
 	tokio_export::spawn(async move {
 		stream
 			.for_each(|msg| async {
-				let payload = msg.into();
+				let payload = R::into_payload(msg);
 				let envelope = ReturnEnvelope {
 					payload,
 					return_path: ReturnPath::Discard,
@@ -100,13 +99,12 @@ where
 /// **N.B**: this function retains the `Arc<dyn Role>` for as long as the future is pending, and will keep the actor alive for that time.
 pub fn send_future_to<R, F>(fut: F, actor: Arc<R>)
 where
-	R: Role + ?Sized + 'static,
+	R: Accepts<F::Output> + ?Sized + 'static,
 	F: Future + Send + 'static,
-	R::Payload: From<F::Output>,
 {
 	tokio_export::spawn(async move {
 		let actor = actor;
-		let payload = fut.await.into();
+		let payload = R::into_payload(fut.await);
 		let envelope = ReturnEnvelope {
 			payload,
 			return_path: ReturnPath::Discard,
@@ -120,30 +118,28 @@ where
 /// Equivalent to, but more efficient than, passing the same parameters to [`send_future_to`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
 ///
 /// Can return an Err if the actor originating the Envelope panics before the message is delivered
-pub async fn send_to<R, Payload, Sender, RetType>(
-	env: Envelope<Sender, RetType>,
-	recipient: Arc<R>,
-) -> Result<(), Role2SendError<Sender>>
+pub async fn send_to<RxRole, SendingRole, BridgeType>(
+	env: Envelope<SendingRole, BridgeType>,
+	recipient: Arc<RxRole>,
+) -> Result<(), Role2SendError<SendingRole>>
 where
-	R: Role<Payload = Payload> + ?Sized + 'static,
-	Sender: Role,
-	Payload: TryFrom<Sender::Return> + Send + 'static,
-	RetType: Send + 'static + TryFrom<Sender::Return>,
+	SendingRole: Emits<BridgeType> + ?Sized + 'static,
+	RxRole: Accepts<BridgeType> + ?Sized + 'static,
 {
 	let (payload, original) = env.unpack();
 
-	let closure = |payload: Sender::Return| -> Pin<Box<dyn Future<Output = ()> + Send>> {
+	let bridge_to_rx_role = |sender_payload| -> Pin<Box<dyn Future<Output = ()> + Send>> {
 		let discard_envelope = ReturnEnvelope {
 			return_path: ReturnPath::Discard,
-			payload:     payload.try_into().unwrap_or_else(|_| unreachable!()),
+			payload:     RxRole::into_payload(SendingRole::from_return_payload(sender_payload)),
 		};
 		Box::pin(async move {
 			let _ = recipient.enqueue(discard_envelope).await;
 		})
 	};
 
-	let val: ReturnEnvelope<Sender> = ReturnEnvelope {
-		return_path: ReturnPath::Mailbox(Box::new(closure)),
+	let val: ReturnEnvelope<SendingRole> = ReturnEnvelope {
+		return_path: ReturnPath::Mailbox(Box::new(bridge_to_rx_role)),
 		payload,
 	};
 
