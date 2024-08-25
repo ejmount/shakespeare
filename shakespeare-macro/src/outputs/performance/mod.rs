@@ -31,13 +31,7 @@ impl PerfDispatch {
 			Ok(None)
 		} else {
 			Ok(PerfDispatch {
-				actor_impl:  ActorPerf::new(
-					actor_path,
-					&payload_type,
-					&return_payload_type,
-					&role_name,
-					handlers,
-				)?,
+				actor_impl:  ActorPerf::new(actor_path, &payload_type, &role_name, handlers)?,
 				dispatch_fn: DispatchFunction::new(
 					&data_name,
 					&role_name,

@@ -15,7 +15,6 @@ impl ActorPerf {
 	pub(crate) fn new(
 		actor_path: &ActorName,
 		payload_type: &Path,
-		return_payload_type: &Path,
 		role_name: &RoleName,
 		handlers: &[FunctionItem],
 	) -> Result<ActorPerf> {
@@ -31,9 +30,9 @@ impl ActorPerf {
 			#[::shakespeare::async_trait_export::async_trait] // Can't be removed because it makes the trait not obj-safe
 			impl #role_name for #actor_path {
 				#(#sending_methods)*
-				fn send(&self, val: shakespeare::Role2Payload<dyn #role_name>) -> ::shakespeare::Envelope<dyn #role_name, #return_payload_type> {
+				/*fn send(&self, val: shakespeare::Role2Payload<dyn #role_name>) -> ::shakespeare::Envelope<dyn #role_name, #return_payload_type> {
 					::shakespeare::Envelope::new(val, self.get_shell())
-				}
+				}*/
 				async fn enqueue(&self, val: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>{
 					self.#sender_name(val).await
 				}

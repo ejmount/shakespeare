@@ -40,7 +40,7 @@ impl RoleOutput {
 			#[allow(dead_code)]
 			#vis trait #role_name: 'static + Send + Sync {
 				#(#signatures;)*
-				fn send(&self, val: #payload_type) -> ::shakespeare::Envelope<dyn #role_name, #return_payload_type>;
+				//fn send(&self, val: #payload_type) -> ::shakespeare::Envelope<dyn #role_name, #return_payload_type>;
 				async fn enqueue(&self, val: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>;
 			}
 		}?;
