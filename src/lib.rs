@@ -45,9 +45,9 @@ use futures::Stream;
 pub type Role2Payload<R> = <R as Role>::Payload;
 #[doc(hidden)]
 pub type Role2Receiver<R> = <<R as Role>::Channel as Channel>::Receiver;
-#[doc(hidden)]
+/// Shortcut to resolve a Role's channel's sender type.
 pub type Role2Sender<R> = <<R as Role>::Channel as Channel>::Sender;
-#[doc(hidden)]
+/// Shortcut to resolve the sender's error type
 pub type Role2SendError<R> = <Role2Sender<R> as RoleSender<ReturnEnvelope<R>>>::Error;
 
 #[doc(hidden)]
@@ -93,7 +93,7 @@ where
 /// Subscribes an actor to a future - the future's output will be delivered to the actor's mailbox when it resolves.
 /// The type constraints ensure that the actor has an unambigious interpretation of the incoming value.
 ///
-/// See also [`add_stream`] if you have a stream of items to deliver rather than a single value.
+/// See also [`send_stream_to`] if you have a stream of items to deliver rather than a single value.
 ///
 /// **N.B**: this function retains the `Arc<dyn Role>` for as long as the future is pending, and will keep the actor alive for that time.
 pub fn send_future_to<R, F>(fut: F, actor: Arc<R>)
@@ -115,7 +115,9 @@ where
 
 /// Arranges for the *return value* produced by processing the given [`Envelope`] to be forwarded to the recipient actor.
 ///
-/// Equivalent to, but more efficient than, passing the same parameters to [`add_future`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
+/// Equivalent to, but more efficient than, passing the same parameters to [`send_future_to`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
+///
+/// Can return an Err if the actor originating the Envelope panics before the message is delivered
 pub async fn send_to<R, Payload, Sender, RetType>(
 	env: Envelope<Sender, RetType>,
 	recipient: Arc<R>,
