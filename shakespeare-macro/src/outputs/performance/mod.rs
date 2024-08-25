@@ -25,7 +25,6 @@ impl PerfDispatch {
 		let handlers = &perf.handlers;
 		let dispatch_method_name = role_name.method_name();
 		let payload_type = role_name.payload_path();
-		let return_payload_type = role_name.return_payload_path();
 
 		if perf.handlers.is_empty() {
 			Ok(None)
