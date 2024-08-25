@@ -29,8 +29,9 @@ impl RoleOutput {
 		let payload_type = role_name.payload_path();
 		let return_payload_type = role_name.return_payload_path();
 
-		let payload_enum = PayloadEnum::new(&payload_type, &signatures)?;
-		let return_payload_enum = ReturnPayload::new(&return_payload_type, &signatures)?;
+		let payload_enum = PayloadEnum::new(&payload_type, &signatures, &role_name)?;
+		let return_payload_enum =
+			ReturnPayload::new(&return_payload_type, &signatures, &role_name)?;
 
 		let mut rewriter = InterfaceRewriter::new(&role_name);
 		let signatures = signatures.into_iter().map(|s| rewriter.fold_signature(s));

@@ -6,6 +6,7 @@ use syn::{
 	Variant,
 };
 
+use crate::data::RoleName;
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
 #[derive(Debug)]
@@ -15,10 +16,14 @@ pub(crate) struct PayloadEnum {
 }
 
 impl PayloadEnum {
-	pub(crate) fn new(payload_type: &Path, methods: &[Signature]) -> Result<PayloadEnum> {
+	pub(crate) fn new(
+		payload_type: &Path,
+		methods: &[Signature],
+		role_name: &RoleName,
+	) -> Result<PayloadEnum> {
 		let variants = map_or_bail!(methods, Self::create_variant);
 
-		let impls = Self::create_from_impls(payload_type, methods)?;
+		let impls = Self::create_from_impls(role_name, methods)?;
 
 		let definition = fallible_quote! {
 			#[allow(unused_parens)]
@@ -28,7 +33,7 @@ impl PayloadEnum {
 		Ok(PayloadEnum { definition, impls })
 	}
 
-	fn create_from_impls(payload_type: &Path, sigs: &[Signature]) -> Result<Vec<ItemImpl>> {
+	fn create_from_impls(role_name: &RoleName, sigs: &[Signature]) -> Result<Vec<ItemImpl>> {
 		let variant_names = sigs.iter().map(variant_name_from_sig);
 
 		let group_map = sigs
@@ -42,17 +47,22 @@ impl PayloadEnum {
 		let impls: Vec<_> = type_vector_set
 			.into_iter()
 			.filter(|(types, (_, n))| !types.is_empty() && *n == 1)
-			.map(|(types, (ident, _))| Self::type_vector_to_from(&types, &ident, payload_type))
+			.map(|(types, (ident, _))| Self::type_vector_to_from(&types, &ident, role_name))
 			.try_collect()?;
 
 		Ok(impls)
 	}
 
-	fn type_vector_to_from(types: &Vec<&Type>, name: &Ident, payload: &Path) -> Result<ItemImpl> {
+	fn type_vector_to_from(
+		types: &Vec<&Type>,
+		name: &Ident,
+		role_name: &RoleName,
+	) -> Result<ItemImpl> {
 		fallible_quote! {
-			impl From<#(#types),*> for #payload {
-				fn from(value: #(#types),*) -> Self {
-					Self::#name ( value )
+			impl ::shakespeare::Accepts<#(#types),*> for dyn #role_name {
+				#[allow(unused_parens)]
+				fn into_payload(value: #(#types),*) -> Self::Payload {
+					Self::Payload::#name ( (value) )
 				}
 			}
 		}
@@ -89,10 +99,14 @@ pub(crate) struct ReturnPayload {
 }
 
 impl ReturnPayload {
-	pub(crate) fn new(return_payload_type: &Path, methods: &[Signature]) -> Result<ReturnPayload> {
+	pub(crate) fn new(
+		return_payload_type: &Path,
+		methods: &[Signature],
+		role_name: &RoleName,
+	) -> Result<ReturnPayload> {
 		let variants = map_or_bail!(methods, Self::create_variant);
 
-		let impls = Self::create_output_from_impls(return_payload_type, methods)?;
+		let impls = Self::create_output_from_impls(return_payload_type, methods, role_name)?;
 
 		let definition = fallible_quote! {
 			#[allow(unused_parens)]
@@ -102,7 +116,11 @@ impl ReturnPayload {
 		Ok(ReturnPayload { definition, impls })
 	}
 
-	fn create_output_from_impls(payload_type: &Path, sigs: &[Signature]) -> Result<Vec<ItemImpl>> {
+	fn create_output_from_impls(
+		payload_type: &Path,
+		sigs: &[Signature],
+		role_name: &RoleName,
+	) -> Result<Vec<ItemImpl>> {
 		let variant_names = sigs.iter().map(variant_name_from_sig);
 
 		let group_map = sigs
@@ -118,19 +136,29 @@ impl ReturnPayload {
 
 		groups
 			.into_iter()
-			.map(|(typ, idents)| Self::create_try_from(payload_type, &typ, &idents))
+			.map(|(typ, idents)| Self::create_try_from(payload_type, &typ, &idents, role_name))
 			.try_collect()
 	}
 
-	fn create_try_from(payload_type: &Path, typ: &Type, idents: &[Ident]) -> Result<ItemImpl> {
+	fn create_try_from(
+		payload_type: &Path,
+		typ: &Type,
+		idents: &[Ident],
+		role_name: &RoleName,
+	) -> Result<ItemImpl> {
 		fallible_quote! {
-			impl TryFrom<#payload_type> for #typ {
-				type Error = ();
+			impl ::shakespeare::Emits<#typ> for dyn #role_name {
 				#[allow(unreachable_patterns)]
-				fn try_from(value: #payload_type) -> ::std::result::Result<Self, Self::Error> {
-					match value {
-						#(|#payload_type::#idents(val)),* => Ok(val),
-						_ => Err(())
+				fn from_return_payload(value: Self::Return) -> #typ {
+					#[allow(irrefutable_let_patterns)]
+					if let #(|Self::Return::#idents(val)),* = value {
+						val
+					}
+					else {
+						unimplemented!("Failed to convert discriminant {:?} into type {} in role {}",
+							core::mem::discriminant(&value),
+							core::any::type_name::<#payload_type>(),
+							core::any::type_name::<dyn #role_name>())
 					}
 				}
 			}

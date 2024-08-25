@@ -9,7 +9,7 @@ use futures::Future;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::{Receiver, Sender};
 
-use crate::{send_future_to, Role};
+use crate::{send_future_to, Accepts, Emits, Role};
 
 type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
 
@@ -62,29 +62,30 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 #[derive(Debug)]
 pub struct Envelope<R, V>
 where
-	R: Role + ?Sized + 'static,
-	V: TryFrom<R::Return>,
+	R: Emits<V> + ?Sized + 'static,
 {
 	val:  Option<R::Payload>,
 	dest: Option<Arc<R>>,
 	_v:   PhantomData<V>,
 }
 
-impl<R, V> Envelope<R, V>
+impl<DestRole, Output> Envelope<DestRole, Output>
 where
-	R: Role + ?Sized,
-	V: TryFrom<R::Return>,
+	DestRole: Emits<Output> + ?Sized,
 {
 	#[doc(hidden)]
-	pub fn new(val: impl Into<R::Payload>, dest: Arc<R>) -> Envelope<R, V> {
+	pub fn new<Input>(val: Input, dest: Arc<DestRole>) -> Envelope<DestRole, Output>
+	where
+		DestRole: Accepts<Input>,
+	{
 		Envelope {
-			val:  Some(val.into()),
+			val:  Some(DestRole::into_payload(val)),
 			dest: Some(dest),
 			_v:   PhantomData {},
 		}
 	}
 
-	pub(crate) fn unpack(mut self) -> (R::Payload, Arc<R>) {
+	pub(crate) fn unpack(mut self) -> (DestRole::Payload, Arc<DestRole>) {
 		let val = (self.val.take().unwrap(), self.dest.take().unwrap());
 		std::mem::forget(self);
 		val
@@ -92,7 +93,7 @@ where
 
 	#[doc(hidden)]
 	#[must_use]
-	pub fn downcast(self) -> Envelope<R, V> {
+	pub fn downcast(self) -> Envelope<DestRole, Output> {
 		let (val, dest) = self.unpack();
 		Envelope {
 			val:  Some(val),
@@ -104,8 +105,7 @@ where
 
 impl<R, V> IntoFuture for Envelope<R, V>
 where
-	R: Role + ?Sized + 'static,
-	V: TryFrom<R::Return>,
+	R: Emits<V> + ?Sized + 'static,
 {
 	#[doc(hidden)]
 	type IntoFuture = ReturnCaster<R, V>;
@@ -133,7 +133,7 @@ where
 	}
 }
 
-impl<R: Role + ?Sized, V: TryFrom<R::Return>> Drop for Envelope<R, V> {
+impl<R: Emits<V> + ?Sized, V> Drop for Envelope<R, V> {
 	fn drop(&mut self) {
 		let val = self.val.take().unwrap();
 		let dest = self.dest.take().unwrap();
@@ -157,26 +157,16 @@ where
 
 impl<R, V> Future for ReturnCaster<R, V>
 where
-	R: Role + ?Sized,
-	V: TryFrom<R::Return>,
+	R: Emits<V> + ?Sized,
 {
 	type Output = std::result::Result<V, RecvError>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let inner = self.project().future;
 
-		inner.poll(cx).map(|val| {
-			val.map(|returned_payload| {
-				let discriminant = core::mem::discriminant(&returned_payload);
-				V::try_from(returned_payload).unwrap_or_else(|_| {
-					unreachable!(
-						"Tried to convert {:?} to {}",
-						discriminant,
-						core::any::type_name::<V>()
-					)
-				})
-			})
-		})
+		inner
+			.poll(cx)
+			.map(|val| val.map(|returned_payload| R::from_return_payload(returned_payload)))
 	}
 }
 
