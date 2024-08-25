@@ -41,13 +41,11 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 	pub async fn send(self, val: Payload) {
 		use ReturnPath::{Discard, Immediate, Mailbox};
 
-		println!("Sending return... ",);
-
 		match self {
 			Discard => (),
 			Mailbox(callback) => callback(val).await,
 			Immediate(channel) => {
-				let _ = channel.send(val).map_err(drop);
+				let _ = channel.send(val);
 			}
 		};
 	}
