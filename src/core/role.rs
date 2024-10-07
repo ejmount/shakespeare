@@ -48,9 +48,9 @@ pub trait Channel {
 #[trait_variant::make(Send)]
 pub trait Role: 'static + Sync + Send {
 	#[doc(hidden)]
-	type Payload: Sized + Send;
+	type Payload: Sized + Send + 'static;
 	#[doc(hidden)]
-	type Return: Sized + Send;
+	type Return: Sized + Send + 'static;
 	#[doc(hidden)]
 	type Channel: Channel<Item = ReturnEnvelope<Self>>;
 	#[doc(hidden)]
