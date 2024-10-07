@@ -165,9 +165,18 @@ where
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let inner = self.project().future;
 
-		inner
-			.poll(cx)
-			.map(|val| val.map(|returned_payload| R::from_return_payload(returned_payload)))
+		inner.poll(cx).map(|val| {
+			val.map(|returned_payload| {
+				let discriminant = core::mem::discriminant(&returned_payload);
+				V::try_from(returned_payload).unwrap_or_else(|_| {
+					unreachable!(
+						"Tried to convert {:?} to {}",
+						discriminant,
+						core::any::type_name::<V>()
+					)
+				})
+			})
+		})
 	}
 }
 
@@ -179,8 +188,8 @@ where
 		write!(
 			f,
 			"ReturnCaster<{}, {}>",
-			std::any::type_name::<R>(),
-			std::any::type_name::<V>()
+			core::any::type_name::<R>(),
+			core::any::type_name::<V>()
 		)
 	}
 }
