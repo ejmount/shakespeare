@@ -31,7 +31,6 @@ impl ActorStruct {
 		let fields = map_or_bail!(performances, shell_field_from_performance);
 
 		let strukt = fallible_quote! {
-			#[derive(Clone)]
 			#actor_vis struct #actor_name {
 				this: ::std::sync::Weak<Self>,
 				#(#fields),*
