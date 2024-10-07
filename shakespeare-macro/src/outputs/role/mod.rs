@@ -46,7 +46,8 @@ impl RoleOutput {
 		}?;
 
 		let role_impl = fallible_quote! {
-			impl<'a> ::shakespeare::Role for dyn #role_name+'a {
+			impl ::shakespeare::Role for dyn #role_name + '_
+			{
 				type Payload = #payload_type;
 				type Return = #return_payload_type;
 				type Channel = ::shakespeare::TokioUnbounded<::shakespeare::ReturnEnvelope<dyn #role_name>>;
