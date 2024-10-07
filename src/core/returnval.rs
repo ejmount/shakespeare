@@ -165,13 +165,9 @@ where
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let inner = self.project().future;
 
-		inner.poll(cx).map(|val| {
-			val.map(|returned_payload| {
-				returned_payload
-					.try_into()
-					.unwrap_or_else(|_| unreachable!("Conversion error"))
-			})
-		})
+		inner
+			.poll(cx)
+			.map(|val| val.map(|returned_payload| R::from_return_payload(returned_payload)))
 	}
 }
 
