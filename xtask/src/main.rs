@@ -1,4 +1,5 @@
 #![warn(clippy::pedantic)]
+#![warn(unused_crate_dependencies)]
 
 use std::env::set_current_dir;
 use std::path::{Path, PathBuf};
@@ -55,6 +56,7 @@ fn main() -> Result<(), Error> {
 
 fn coverage(readable: bool, open_report: Option<bool>) -> Result<(), Error> {
 	set_current_dir(root_crate_dir())?;
+	set_current_dir("shakespeare-macro")?;
 	create_all("coverage", true)?;
 
 	print!("Running tests... ");
@@ -70,6 +72,8 @@ fn coverage(readable: bool, open_report: Option<bool>) -> Result<(), Error> {
 	} else {
 		("lcov", "coverage/tests.lcov")
 	};
+
+	set_current_dir(root_crate_dir())?;
 
 	print!("Generating reports as {fmt}... ");
 	cmd!(
