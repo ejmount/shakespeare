@@ -1,6 +1,6 @@
 [package]
 name = "xtask"
-version.workspace = true
+version = "0.0.0" # Don't want to publish this
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
