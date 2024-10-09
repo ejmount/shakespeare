@@ -1,4 +1,4 @@
-name: Build
+name: Build & Test
 on:
   pull_request:
   push:
@@ -9,19 +9,22 @@ on:
   # - cron: '00 01 * * *'
 
 jobs:
-  check:
-    name: Check
+  checks:
+    name: Lints
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
-      - name: Install stable toolchain
+      - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: nightly
           override: true
+          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v1
 
@@ -30,18 +33,31 @@ jobs:
         with:
           command: check
 
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+            command: clippy
+            args: -- -D warnings
+
   test:
     name: Test Suite
+    needs: checks
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [stable]
+        rust: [stable, nightly]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install stable toolchain
+      - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -56,12 +72,9 @@ jobs:
           command: test
 
   coverage:
-    name: Coverage
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        rust: [stable]
-    runs-on: ${{ matrix.os }}
+    name: Coveragee
+    needs: test
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
@@ -69,7 +82,7 @@ jobs:
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           override: true
           components: llvm-tools-preview
 
@@ -92,34 +105,3 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ejmount/shakespeare
-
-  lints:
-    name: Lints
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
-        with:
-          submodules: true
-
-      - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v1
-
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
