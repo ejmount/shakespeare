@@ -8,13 +8,13 @@ use crate::data::RoleName;
 pub(crate) struct InterfaceRewriter<'a> {
 	role_name: &'a RoleName,
 }
-impl<'a> InterfaceRewriter<'a> {
+impl InterfaceRewriter<'_> {
 	pub(crate) fn new(role_name: &RoleName) -> InterfaceRewriter {
 		InterfaceRewriter { role_name }
 	}
 }
 
-impl<'a> Fold for InterfaceRewriter<'a> {
+impl Fold for InterfaceRewriter<'_> {
 	fn fold_receiver(&mut self, _: Receiver) -> Receiver {
 		parse_quote! { &self }
 	}

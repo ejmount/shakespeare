@@ -43,6 +43,8 @@ pub trait Channel {
 	}
 }
 
+/// A Role that an Actor can implement.
+///
 /// Roles implement this trait, which describes the generic features all roles contain. See the [`role!`][`::shakespeare_macro::role`] macro for more information.
 /// No internal details of this trait are relevant to external users, only whether it is implemented and its related implementations of ['Accepts'] and ['Emits']
 #[trait_variant::make(Send)]
