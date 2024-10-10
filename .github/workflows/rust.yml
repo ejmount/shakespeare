@@ -37,7 +37,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --all -- --check
+          args: -p shakespeare-macro -p shakespeare -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
@@ -53,6 +53,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         rust: [stable, nightly]
     runs-on: ${{ matrix.os }}
+    env:
+        TOOLCHAIN: ${{ matrix.os }} # Used for trybuild testing to catch inconsistent messages on nightly
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
