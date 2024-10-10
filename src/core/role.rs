@@ -46,7 +46,9 @@ pub trait Channel {
 /// Roles implement this trait, which describes the generic features all roles contain. See the [`role!`][`::shakespeare_macro::role`] macro for more information.
 /// No internal details of this trait are relevant to external users, only whether it is implemented and its related implementations of ['Accepts'] and ['Emits']
 #[trait_variant::make(Send)]
-pub trait Role: 'static + Sync + Send {
+// This logically *should* be 'static but the compiler can't deal with the lifetime bounds properly. See https://github.com/rust-lang/rust/issues/131488
+// The compiler seems to be OK if 'static is listed seperately in the signature of the functions that need it.
+pub trait Role: Sync + Send {
 	#[doc(hidden)]
 	type Payload: Sized + Send + 'static;
 	#[doc(hidden)]

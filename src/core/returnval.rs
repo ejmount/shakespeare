@@ -62,7 +62,7 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 #[derive(Debug)]
 pub struct Envelope<R, V>
 where
-	R: Role + ?Sized,
+	R: Role + ?Sized + 'static,
 	V: TryFrom<R::Return>,
 {
 	val:  Option<R::Payload>,
@@ -104,7 +104,7 @@ where
 
 impl<R, V> IntoFuture for Envelope<R, V>
 where
-	R: Role + ?Sized,
+	R: Role + ?Sized + 'static,
 	V: TryFrom<R::Return>,
 {
 	#[doc(hidden)]
