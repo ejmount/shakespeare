@@ -70,7 +70,7 @@ where
 /// **N.B**: this function retains the `Arc<dyn Role>` for as long as the stream is still active, and will keep the actor alive for that time.
 pub fn send_stream_to<R, S>(stream: S, actor: Arc<R>)
 where
-	R: Role + ?Sized,
+	R: Role + ?Sized + 'static,
 	S: Stream + Send + 'static,
 	R::Payload: From<S::Item>,
 	<S as Stream>::Item: Send,
@@ -98,7 +98,7 @@ where
 /// **N.B**: this function retains the `Arc<dyn Role>` for as long as the future is pending, and will keep the actor alive for that time.
 pub fn send_future_to<R, F>(fut: F, actor: Arc<R>)
 where
-	R: Role + ?Sized,
+	R: Role + ?Sized + 'static,
 	F: Future + Send + 'static,
 	R::Payload: From<F::Output>,
 {
@@ -123,7 +123,7 @@ pub async fn send_to<R, Payload, Sender, RetType>(
 	recipient: Arc<R>,
 ) -> Result<(), Role2SendError<Sender>>
 where
-	R: Role<Payload = Payload> + ?Sized,
+	R: Role<Payload = Payload> + ?Sized + 'static,
 	Sender: Role,
 	Payload: TryFrom<Sender::Return> + Send + 'static,
 	RetType: Send + 'static + TryFrom<Sender::Return>,
