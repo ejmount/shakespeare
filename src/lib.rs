@@ -90,7 +90,9 @@ where
 	});
 }
 
-/// Subscribes an actor to a future - the future's output will be delivered to the actor's mailbox when it resolves.
+/// Send a future value to an actor.
+///
+/// The future's output will be delivered to the actor's mailbox when it resolves.
 /// The type constraints ensure that the actor has an unambigious interpretation of the incoming value.
 ///
 /// See also [`send_stream_to`] if you have a stream of items to deliver rather than a single value.

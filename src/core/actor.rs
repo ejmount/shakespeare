@@ -50,6 +50,8 @@ where
 {
 }
 
+/// A handle for the actor's exit value.
+///
 /// Serves the same role as [`std::thread::JoinHandle`], but for an actor. Can be awaited to receive the actor's output value.
 /// As with `JoinHandle`, dropping this value without awaiting it detaches the actor task and makes any output value from the actor inaccessible.
 pub struct Handle<A: Shell>(JoinHandle<Result<A::ExitType, A::PanicType>>);

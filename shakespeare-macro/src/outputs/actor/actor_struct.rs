@@ -44,8 +44,12 @@ impl ActorStruct {
 
 		let sender_method_name_impl = create_inherent_impl(&role_names, actor_vis, actor_name)?;
 
-		let meta_trait =
-			create_meta_trait_impl(panic_handler, exit_handler, actor_name, &data_item.name())?;
+		let meta_trait = create_meta_trait_impl(
+			panic_handler.as_ref(),
+			exit_handler.as_ref(),
+			actor_name,
+			&data_item.name(),
+		)?;
 
 		Ok(ActorStruct {
 			strukt,
@@ -64,8 +68,8 @@ impl ToTokens for ActorStruct {
 }
 
 fn create_meta_trait_impl(
-	panic_handler: &Option<ItemFn>,
-	exit_handler: &Option<ItemFn>,
+	panic_handler: Option<&ItemFn>,
+	exit_handler: Option<&ItemFn>,
 	actor_name: &ActorName,
 	data_name: &DataName,
 ) -> Result<[ItemImpl; 2]> {
