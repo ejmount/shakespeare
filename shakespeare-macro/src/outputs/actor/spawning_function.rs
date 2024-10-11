@@ -89,10 +89,10 @@ impl SpawningFunction {
 		let fun: ItemImpl = fallible_quote! {
 			impl #actor_name {
 				pub fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
-					use ::shakespeare::{ActorSpawn, Channel, catch_future};
+					use ::shakespeare::{ActorSpawn, Channel, catch_future, tokio_export as tokio};
 					use ::std::sync::Arc;
-					use ::tokio::{select, pin};
-					use ::tokio::time::{sleep, Duration, Instant};
+					use tokio::{select, pin};
+					use tokio::time::{sleep, Duration, Instant};
 
 					const IDLE_TIMEOUT: Duration = Duration::from_millis(50);
 
@@ -137,7 +137,7 @@ impl SpawningFunction {
 						result
 					};
 
-					let join_handle = ::tokio::task::spawn(event_loop);
+					let join_handle = tokio::task::spawn(event_loop);
 					ActorSpawn::new(actor, join_handle)
 				}
 			}

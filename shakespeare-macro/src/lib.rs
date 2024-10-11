@@ -12,6 +12,7 @@
 #![warn(clippy::todo)]
 #![warn(clippy::unimplemented)]
 #![forbid(future_incompatible)]
+#![warn(unused_crate_dependencies)]
 
 mod data;
 mod declarations;
