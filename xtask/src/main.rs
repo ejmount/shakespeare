@@ -1,6 +1,5 @@
 #![warn(clippy::pedantic)]
 #![warn(unused_crate_dependencies)]
-
 use std::env::set_current_dir;
 use std::path::{Path, PathBuf};
 
@@ -11,6 +10,12 @@ use dialoguer::Confirm;
 use duct::cmd;
 use fs_extra::dir::{create_all, get_dir_content};
 use fs_extra::file::remove;
+#[cfg(test)]
+use shakespeare as _;
+#[cfg(test)]
+use tokio as _;
+#[cfg(test)]
+use trybuild as _;
 
 mod expander;
 #[path = "stripped_macro/lib.rs"]
