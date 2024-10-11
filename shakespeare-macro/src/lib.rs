@@ -78,9 +78,10 @@ fn make_role(imp: ItemTrait) -> Result<RoleOutput> {
 /// The `syn::parse_macro_input` macro is unsuitable for how this code works outside of an actually proc-macro crate beacuse it hardcodes the error return type as `proc_macro::TokenStream`
 /// This creates problems when the xtask module tries to import it into a non-macro context.
 /// This code is functionally the same, except that, being an ordinary function, we can't return early.
-fn parse_macro_input<T: Parse>(tokens: TokenStream) -> ::std::result::Result<T, TokenStream> {
-	let tokens = proc_macro2::TokenStream::from(tokens); // Yes this looks redundant but it's so that TokenStream can be swapped out
-	syn::parse2(tokens).map_err(|err| TokenStream::from(err.to_compile_error()))
+fn parse_macro_input<T: Parse>(
+	tokens: proc_macro2::TokenStream,
+) -> ::std::result::Result<T, proc_macro2::TokenStream> {
+	syn::parse2(tokens).map_err(|err| err.to_compile_error())
 }
 
 /// The starting point - defines a new actor type
@@ -101,11 +102,20 @@ fn parse_macro_input<T: Parse>(tokens: TokenStream) -> ::std::result::Result<T, 
 ///
 /// The `ActorSpawn` also contains a `Handle`, which is a future that will yield the value produced by the actor stopping, either successfully or by panic.
 #[proc_macro_attribute]
-pub fn actor(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn actor(attr: TokenStream, item: TokenStream) -> TokenStream {
+	actor_internal(attr.into(), item.into()).into()
+}
+
+/// This exists for testing purposes.
+#[expect(clippy::needless_pass_by_value)]
+fn actor_internal(
+	_attr: proc_macro2::TokenStream,
+	item: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
 	match parse_macro_input(item) {
 		Ok(module) => match make_actor(module) {
-			Ok(actor_ouput) => actor_ouput.to_token_stream().into(),
-			Err(e) => e.into_compile_error().into_token_stream().into(),
+			Ok(actor_ouput) => actor_ouput.to_token_stream(),
+			Err(e) => e.into_compile_error().into_token_stream(),
 		},
 		Err(err) => err,
 	}
@@ -116,12 +126,12 @@ pub fn actor(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// This macro applies is applided to an `impl` block naming the role being implemented
 #[proc_macro_attribute]
 pub fn performance(_attr: TokenStream, item: TokenStream) -> TokenStream {
-	match parse_macro_input(item) {
+	match parse_macro_input(item.into()) {
 		Ok(imp) => match make_performance(imp) {
 			Ok(perf) => perf.to_token_stream().into(),
 			Err(e) => e.into_compile_error().into_token_stream().into(),
 		},
-		Err(err) => err,
+		Err(err) => err.into(),
 	}
 }
 
@@ -130,11 +140,34 @@ pub fn performance(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// This macro applies to a `trait` block, and works very similarly to conventional traits.
 #[proc_macro_attribute]
 pub fn role(_attr: TokenStream, item: TokenStream) -> TokenStream {
-	match parse_macro_input(item) {
+	match parse_macro_input(item.into()) {
 		Ok(imp) => match make_role(imp) {
 			Ok(role) => role.to_token_stream().into(),
 			Err(e) => e.into_compile_error().into_token_stream().into(),
 		},
-		Err(err) => err,
+		Err(err) => err.into(),
+	}
+}
+
+#[cfg(test)]
+mod tests {
+
+	use std::path::PathBuf;
+	use std::str::FromStr;
+	use std::{env, fs};
+
+	use runtime_macros::emulate_attributelike_macro_expansion;
+
+	#[test] // EXPANDER EXCLUDE
+	fn expand_actor() {
+		// This code doesn't check much. Instead, it does macro expansion at run time to let
+		// code coverage work for the macro.
+		let path = env::var("CARGO_MANIFEST_DIR").unwrap();
+		let mut path = PathBuf::from_str(&path).unwrap();
+		path.push("tests");
+		path.push("successes");
+		path.push("basic.rs");
+		let file = fs::File::open(path).unwrap();
+		emulate_attributelike_macro_expansion(file, &[("actor", crate::actor_internal)]).unwrap();
 	}
 }

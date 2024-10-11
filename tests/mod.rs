@@ -9,5 +9,3 @@ fn ux() {
 		t.compile_fail("tests/fails/multiple_data.rs");
 	}
 }
-
-mod successes;

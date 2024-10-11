@@ -35,3 +35,5 @@ walkdir = "2.5.0"
 shakespeare = { path = ".." } # Doesn't need a version because this crate isn't published
 trybuild = "1.0.91"
 tokio = "1.37.0"
+runtime-macros = "1.1.0"
+futures = "0.3.31"
