@@ -26,4 +26,3 @@ futures = "0.3.31"
 runtime-macros = "1.1.0"
 shakespeare = { path = ".." }
 tokio = "1.40.0"
-

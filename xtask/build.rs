@@ -32,6 +32,7 @@ fn main() -> Result<(), walkdir::Error> {
 					|| line.starts_with("#![warn(")
 					|| line.starts_with("#![deny(")
 					|| line.starts_with("#![forbid(")
+					|| line.contains("#[test] // EXPANDER EXCLUDE")
 				{
 					continue;
 				}
