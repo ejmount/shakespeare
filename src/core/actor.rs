@@ -96,7 +96,7 @@ pub trait Shell {
 	type PanicType;
 }
 
-/// The state type of an actor. This is for macro use only.
+/// The state type of an actor. This trait is for macro use only.
 pub trait State {
 	/// The internal state type within this shell
 	type ShellType: Shell<StateType = Self>;

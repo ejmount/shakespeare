@@ -113,12 +113,12 @@ where
 	});
 }
 
-/// Arranges for the *return value* produced by processing the given [`Envelope`] to be forwarded to the recipient actor.
+/// Arranges for the *return value* produced by processing the given [`Envelope`] to be forwarded to the recipient actor. Any return value produced by the receipient is ignored.
 ///
 /// Equivalent to, but more efficient than, passing the same parameters to [`send_future_to`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
 ///
 /// Can return an Err if the actor originating the Envelope panics before the message is delivered
-pub async fn send_to<RxRole, SendingRole, BridgeType>(
+pub async fn send_return_to<RxRole, SendingRole, BridgeType>(
 	env: Envelope<SendingRole, BridgeType>,
 	recipient: Arc<RxRole>,
 ) -> Result<(), Role2SendError<SendingRole>>
@@ -145,3 +145,8 @@ where
 
 	original.enqueue(val).await
 }
+
+#[doc(hidden)]
+#[doc = include_str!("../README.md")]
+#[expect(dead_code)]
+struct ReadmeDoctests;
