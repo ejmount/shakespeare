@@ -62,27 +62,25 @@ pub trait Role: Sync + Send {
 	async fn enqueue(&self, val: ReturnEnvelope<Self>) -> Result<(), Role2SendError<Self>>;
 }
 
-/// A Role implementing this trait means that exactly one method of the Role has a parameter list corresponding to T. This means the actor can determine what method call is intended from the value alone, and so can implement [`send_future_to`] and similar. Methods explicitly defined in the Role can be called whether or not an `Accepts` implementation exists.
+/// This Role can be sent `T` values
+///
+/// A Role implementing this trait means that exactly one method of the Role has a parameter list corresponding to `T`. This means the actor can determine what method call is intended from the value alone, and so can implement [`crate::send_future_to`] and similar. Methods explicitly defined in the Role can be called whether or not an `Accepts` implementation exists.
 pub trait Accepts<T>: Role {
 	#[doc(hidden)]
 	fn into_payload(t: T) -> Self::Payload;
 }
-// The implementation of these traits is tricky because
-// 1) impl Accepts<_> for dyn Role - doesn't work because dyn Trait isn't general enough.
-// 2) impl<T: Role> Accepts<_> for T - doesn't work because Accepts isn't in the client crate so we hit coherency and specialisation issues
-// Also can't lose the supertrait because we need the associated types
-// We need it implemented on the trait types rather than underlying actor shells want to convert a Role into an Accepts for the appropriate types
-// So can it be implemented without it
 
 #[doc(hidden)]
-/// Need this so that [`Envelope::drop`] works as you'd expect
+/// Need this so that [`crate::Envelope`] can be dropped to send off the item
 impl<R: Role + ?Sized> Accepts<R::Payload> for R {
 	fn into_payload(t: R::Payload) -> Self::Payload {
 		t
 	}
 }
 
-/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. This is primarily required to make [`Envelope`] ergonomic but also underpins [`send_to`].
+/// At least one method of this Role produces a `T`
+///
+/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. This is primarily required to make [`crate::Envelope`] ergonomic but also underpins [`crate::send_return_to`].
 pub trait Emits<T>: Role {
 	#[doc(hidden)]
 	fn from_return_payload(t: Self::Return) -> T;

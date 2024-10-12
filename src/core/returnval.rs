@@ -53,12 +53,12 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 
 /// A message that has been prepared to be (*but not yet*) sent to an actor, produced by calling a method on the actor shell.
 ///
-/// This type allows the caller to control how the return value produced by the actor processing the message will be handled. As a result, while this value exists the message has not been sent.
+/// This type allows the caller to control how the return value, of type `V`, produced by the actor processing the message will be handled. As a result, while this value exists the message has not been sent.
 ///
 /// The caller is expected to do one of three things with this value:
 /// 1. nothing - that is, allowing it to drop will dispatch the message and have any return value thrown away
 /// 2. awaiting this value will yield the return value to the caller
-/// 3. calling [`send_to`][`crate::send_to`] will send the return value directly to another actor's mailbox.
+/// 3. calling [`send_return_to`][`crate::send_return_to`] will send the return value directly to another actor's mailbox.
 #[derive(Debug)]
 pub struct Envelope<R, V>
 where
