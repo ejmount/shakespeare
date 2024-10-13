@@ -112,7 +112,6 @@ pub fn actor(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// This exists for test coverage purposes.
-#[expect(clippy::needless_pass_by_value)]
 fn actor_internal(
 	_attr: proc_macro2::TokenStream,
 	item: proc_macro2::TokenStream,
