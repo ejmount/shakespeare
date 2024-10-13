@@ -29,6 +29,7 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::parse::Parse;
 use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem, Type};
+use visibility as _;
 
 #[cfg_attr(not(proc_macro), visibility::make(pub))]
 fn make_actor(module: ItemMod) -> Result<ActorOutput> {

@@ -42,7 +42,7 @@ impl PayloadEnum {
 			.zip(variant_names.map(|a| (a, 1)))
 			.into_grouping_map();
 
-		let type_vector_set = group_map.fold_first(|(ident, count), _, v| (ident, count + v.1));
+		let type_vector_set = group_map.reduce(|(ident, count), _, v| (ident, count + v.1));
 
 		let impls: Vec<_> = type_vector_set
 			.into_iter()

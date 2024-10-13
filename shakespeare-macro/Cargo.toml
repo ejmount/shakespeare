@@ -13,11 +13,11 @@ description = "A support crate for the shakespeare actor framework"
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0.82"
-quote = "1.0.36"
-syn = { version = "2.0.61", features = ["full", "fold", "extra-traits"] }
+proc-macro2 = "1.0.87"
+quote = "1.0.37"
+syn = { version = "2.0.79", features = ["full", "fold", "extra-traits"] }
 convert_case = "0.6.0"
-itertools = "0.12.1"
+itertools = "0.13.0"
 structmeta = "0.3.0"
 visibility = "0.1.1"
 
