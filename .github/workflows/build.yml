@@ -1,5 +1,6 @@
 name: Build & Test
 on:
+  workflow_call:
   pull_request:
   push:
     branches:
@@ -18,7 +19,7 @@ jobs:
         with:
           submodules: true
 
-      - name: Install nightly toolchain
+      - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
