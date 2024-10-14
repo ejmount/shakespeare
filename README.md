@@ -24,6 +24,7 @@ Shakespeare currently runs exclusively on tokio but this may change in the futur
 ```rust
 use std::sync::Arc;
 use shakespeare::{actor, performance, role, ActorSpawn};
+use tokio::time::{Duration, sleep};
 
 #[role]
 trait BasicRole {
@@ -68,17 +69,18 @@ async fn main() {
     let actors: Vec<Arc<dyn BasicRole>> = vec![actor_a, actor_b];
 
     for (ind, a) in actors.iter().enumerate() {
-        a.read(ind+1); // Can fire and forget
+        a.read(ind+1); // Can fire and forget, but...
     }
+    // ...we didn't wait for them to arrive.
+    sleep(Duration::from_millis(50));
+    // In real code, you should use `Envelope`'s `ignore` method when ordering between messages to a single receiver within a single function is important but the return value is not, as is the case here.
 
     let mut total = 0;
     for a in &actors {
         total += a.speak().await.expect("Actor shouldn't crash");
-        // Only have to await to get the return value
+        // Wait for the actor to process the message and return a value
     }
-
     assert_eq!(total, 4);
-
 }
 ```
 

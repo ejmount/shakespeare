@@ -9,7 +9,7 @@ use futures::Future;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::{Receiver, Sender};
 
-use crate::{send_future_to, Accepts, Emits, Role};
+use crate::{send_future_to, Accepts, Emits, Role, Role2SendError};
 
 type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
 
@@ -51,14 +51,17 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 	}
 }
 
-/// A message that has been prepared to be (*but not yet*) sent to an actor, produced by calling a method on the actor shell.
+/// A message that has been prepared to be (*but not yet*) sent to an actor, produced by calling a Role method on the actor shell.
 ///
 /// This type allows the caller to control how the return value, of type `V`, produced by the actor processing the message will be handled. As a result, while this value exists the message has not been sent.
 ///
-/// The caller is expected to do one of three things with this value:
-/// 1. nothing - that is, allowing it to drop will dispatch the message and have any return value thrown away
-/// 2. awaiting this value will yield the return value to the caller
-/// 3. calling [`send_return_to`][`crate::send_return_to`] will send the return value directly to another actor's mailbox.
+/// The caller is expected to do one of four things with this value:
+/// 1. nothing - that is, allowing it to drop will dispatch the message and have any return value thrown away, but *will not* wait for the message delivery to complete.
+/// 2. awaiting this value will wait for the actor to recive and process the message, then yield the return value to the caller
+/// 3. calling [`ignore()`][`Envelope::ignore`] and awaiting the resulting future *will wait* for the message to be sent, but will throw away any return value.
+/// 4. calling [`send_return_to`][`crate::send_return_to`] will send the return value directly to another actor's mailbox.
+///
+/// **NB**: In case 1, there is no ordering established with other messages sent to the same receiver, even from the same sender. In all other cases, multiple messages to the same receiver from a given sender will be received in sending order. In all cases, ordering between messages sent to different receivers or from different senders is unspecified.
 #[derive(Debug)]
 pub struct Envelope<R, V>
 where
@@ -91,15 +94,24 @@ where
 		val
 	}
 
-	#[doc(hidden)]
-	#[must_use]
-	pub fn downcast(self) -> Envelope<DestRole, Output> {
-		let (val, dest) = self.unpack();
-		Envelope {
-			val:  Some(val),
-			dest: Some(dest),
-			_v:   PhantomData {},
-		}
+	/// This method will wait for the message to arrive at the receiving actor, but will not wait for any return value, which will be dropped.
+	///
+	/// # Errors
+	///
+	/// This function may return `Err` if the actor has already stopped, i.e. has panicked.
+	#[must_use = "The message will not be sent to the actor if this Future isn't processed"]
+	#[expect(clippy::missing_panics_doc)] // This is complaining about the `take`, but that should only be None if this has dropped
+	pub async fn ignore(mut self) -> Result<(), Role2SendError<DestRole>> {
+		let payload = self.val.take().unwrap();
+		let dest = self.dest.take().unwrap();
+
+		let return_path = ReturnPath::Discard;
+
+		dest.enqueue(ReturnEnvelope {
+			payload,
+			return_path,
+		})
+		.await
 	}
 }
 
@@ -146,6 +158,8 @@ impl<R: Emits<V> + ?Sized, V> Drop for Envelope<R, V> {
 #[pin_project::pin_project]
 /// A future that awaits on an [`Envelope`] being processed and appropriately casts the return value
 /// This can fail and produce an `Err` if the actor's message handler aborts without completing.
+///
+/// This exists because the type for [`Envelope::into_future`] needs to be nameable, which Future::map is not.
 pub struct ReturnCaster<R, V>
 where
 	R: Role + ?Sized,
