@@ -17,6 +17,10 @@ jobs:
         needs: validate
         runs-on: ubuntu-latest
         steps:
+            - name: Checkout sources
+              uses: actions/checkout@v2
+              with:
+                submodules: true
             - name: Check semver
               uses: obi1kenobi/cargo-semver-checks-action@v2
 
@@ -24,11 +28,11 @@ jobs:
               id: create_release
               uses: actions/create-release@v1
               env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                 tag_name: ${{ github.ref }}
                 release_name: Release ${{ github.ref }}
-                draft: false
+                draft: true
                 prerelease: false
 
             - name: publish crates.io
