@@ -25,37 +25,24 @@ Shakespeare currently runs exclusively on tokio but this may change in the futur
 use std::sync::Arc;
 use shakespeare::{actor, performance, role, ActorSpawn};
 use tokio::time::{Duration, sleep};
+use tokio::sync::mpsc::*;
 
 #[role]
 trait BasicRole {
-    fn read(&mut self, val: usize);
-    fn speak(&self) -> usize;
+    fn inform(&mut self, val: usize);
+    fn get(&self) -> usize;
 }
 
 #[actor]
-mod ActorA {
-    struct StateA(usize);
+mod Actor {
+    struct StateA(UnboundedSender<usize>);
     #[performance]
     impl BasicRole for State {
-        fn read(&mut self, val: usize) {
-            self.0 = val;
+        async fn inform(&mut self, val: usize) {
+            self.0.send(val);
         }
-        fn speak(&self) -> usize {
-            2* self.0
-        }
-    }
-}
-
-#[actor]
-mod ActorB {
-    struct StateB(usize);
-    #[performance]
-    impl BasicRole for State {
-        fn read(&mut self, val: usize) {
-            self.0 = val;
-        }
-        fn speak(&self) -> usize {
-            self.0
+        fn get(&self) -> usize {
+            42
         }
     }
 }
@@ -63,24 +50,19 @@ mod ActorB {
 
 #[tokio::main]
 async fn main() {
-    let actor_a = ActorA::start(StateA(0)).msg_handle;
-    let actor_b = ActorB::start(StateB(0)).msg_handle;
+    let (tx, mut rx) = unbounded_channel();
 
-    let actors: Vec<Arc<dyn BasicRole>> = vec![actor_a, actor_b];
-
-    for (ind, a) in actors.iter().enumerate() {
-        a.read(ind+1); // Can fire and forget, but...
+    let actor: Arc<dyn BasicRole> = Actor::start(StateA(tx)).msg_handle;
+    {
+        actor.inform(100);
+        // can let the message drop to fire and forget
     }
-    // ...we didn't wait for them to arrive.
-    sleep(Duration::from_millis(50));
-    // In real code, you should use `Envelope`'s `ignore` method when ordering between messages to a single receiver within a single function is important but the return value is not, as is the case here.
+    let value = rx.recv().await;
+    assert_eq!(value, Some(100));
 
-    let mut total = 0;
-    for a in &actors {
-        total += a.speak().await.expect("Actor shouldn't crash");
-        // Wait for the actor to process the message and return a value
-    }
-    assert_eq!(total, 4);
+    let ret_value = actor.get().await; // But also await to get a syncronous return value
+
+    assert_eq!(ret_value, Ok(42));
 }
 ```
 
