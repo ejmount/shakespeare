@@ -23,7 +23,7 @@ jobs:
             # Using shell: bash explicitly because it turns on safety features like pipefail
               shell: bash
               run: |
-                echo "tag=v$(cargo metadata --format-version 1 | jq '.packages[] | select(.name == "shakespeare").version')" >> "$GITHUB_OUTPUT"
+                echo "tag=v$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "shakespeare").version')" >> "$GITHUB_OUTPUT"
 
             - name: Check for pre-existing release
               id: safety
@@ -62,7 +62,7 @@ jobs:
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git tag -a ${{ steps.release-tag.outputs.tag }}
+                  git tag -a -m "Release ${{ steps.release-tag.outputs.tag }}" ${{ steps.release-tag.outputs.tag }}
                   git push --tags
               # https://github.com/actions/checkout?tab=readme-ov-file#push-a-commit-using-the-built-in-token
 
