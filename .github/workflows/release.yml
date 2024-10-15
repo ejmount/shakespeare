@@ -45,8 +45,8 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: ${{ github.ref }}
-                release_name: Release ${{ github.ref }}
+                tag_name: "v${{ steps.release-tag.outputs.tag }}"
+                release_name: Release v${{ steps.release-tag.outputs.tag }}
                 draft: true
                 prerelease: false
 
@@ -60,9 +60,11 @@ jobs:
             - name: Tag release
               shell: bash
               run: |
-                  git tag -a "v${{ steps.release-tag.outputs.tag }}"
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git tag -a ${{ steps.release-tag.outputs.tag }}
                   git push --tags
-
+              # https://github.com/actions/checkout?tab=readme-ov-file#push-a-commit-using-the-built-in-token
 
 
 
