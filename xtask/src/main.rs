@@ -61,10 +61,20 @@ fn main() -> Result<(), Error> {
 
 fn coverage(readable: bool, open_report: Option<bool>) -> Result<(), Error> {
 	set_current_dir(root_crate_dir())?;
-	set_current_dir("shakespeare-macro")?;
-	create_all("coverage", true)?;
 
-	print!("Running tests... ");
+	create_all("coverage", true)?;
+	set_current_dir("shakespeare-macro")?;
+
+	print!("Running macro tests... ");
+	cmd!("cargo", "test")
+		.env("CARGO_INCREMENTAL", "0")
+		.env("RUSTFLAGS", "-Cinstrument-coverage")
+		.env("LLVM_PROFILE_FILE", "../coverage/cargo-test-%p-%m.profraw")
+		.run()?;
+	println!("{}", "ok".color(Color::Green));
+
+	set_current_dir(root_crate_dir())?;
+	print!("Running main tests... ");
 	cmd!("cargo", "test")
 		.env("CARGO_INCREMENTAL", "0")
 		.env("RUSTFLAGS", "-Cinstrument-coverage")
@@ -78,7 +88,7 @@ fn coverage(readable: bool, open_report: Option<bool>) -> Result<(), Error> {
 		("lcov", "coverage/tests.lcov")
 	};
 
-	set_current_dir(root_crate_dir())?;
+	//set_current_dir(root_crate_dir())?;
 
 	print!("Generating reports as {fmt}... ");
 	cmd!(

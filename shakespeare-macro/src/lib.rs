@@ -182,13 +182,21 @@ fn actor_internal(
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn performance(_attr: TokenStream, item: TokenStream) -> TokenStream {
-	match parse_macro_input(item.into()) {
+pub fn performance(attr: TokenStream, item: TokenStream) -> TokenStream {
+	performance_internal(attr.into(), item.into()).into()
+}
+
+fn performance_internal(
+	attr: proc_macro2::TokenStream,
+	item: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	std::mem::drop(attr); // <-- Removes a clippy warning, because we need this exact signature for tests
+	match parse_macro_input(item) {
 		Ok(imp) => match make_performance(imp) {
-			Ok(perf) => perf.to_token_stream().into(),
-			Err(e) => e.into_compile_error().into_token_stream().into(),
+			Ok(perf) => perf.to_token_stream(),
+			Err(e) => e.into_compile_error().into_token_stream(),
 		},
-		Err(err) => err.into(),
+		Err(err) => err,
 	}
 }
 
@@ -207,24 +215,35 @@ pub fn performance(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Except for the above restrictions, a role is otherwise a normal trait and its methods can have any number of methods, input parameters, and return values of any type.
 /// (Be aware that extremely large types being passed by value may cause performance impacts - these can be avoided by passing `Box` etc instead)
 #[proc_macro_attribute]
-pub fn role(_attr: TokenStream, item: TokenStream) -> TokenStream {
-	match parse_macro_input(item.into()) {
+pub fn role(attr: TokenStream, item: TokenStream) -> TokenStream {
+	role_internal(attr.into(), item.into()).into()
+}
+
+fn role_internal(
+	attr: proc_macro2::TokenStream,
+	item: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	std::mem::drop(attr); // <-- Removes a clippy warning, because we need this exact signature for tests
+	match parse_macro_input(item) {
 		Ok(imp) => match make_role(imp) {
-			Ok(role) => role.to_token_stream().into(),
-			Err(e) => e.into_compile_error().into_token_stream().into(),
+			Ok(role) => role.to_token_stream(),
+			Err(e) => e.into_compile_error().into_token_stream(),
 		},
-		Err(err) => err.into(),
+		Err(err) => err,
 	}
 }
 
 #[cfg(test)]
 mod tests {
 
+	use std::fs::{DirEntry, ReadDir};
 	use std::path::PathBuf;
 	use std::str::FromStr;
 	use std::{env, fs};
 
 	use runtime_macros::emulate_attributelike_macro_expansion;
+
+	use crate::role_internal;
 
 	#[test] // EXPANDER EXCLUDE
 	fn expand_actor() {
@@ -234,8 +253,33 @@ mod tests {
 		let mut path = PathBuf::from_str(&path).unwrap();
 		path.push("tests");
 		path.push("successes");
-		path.push("basic.rs");
-		let file = fs::File::open(path).unwrap();
-		emulate_attributelike_macro_expansion(file, &[("actor", crate::actor_internal)]).unwrap();
+		let dir = fs::read_dir(path).expect("Can't access {path}");
+
+		expand_for_dir(dir);
+	}
+
+	fn expand_for_dir(dir: fs::ReadDir) {
+		let macros: &[(
+			&str,
+			fn(proc_macro2::TokenStream, proc_macro2::TokenStream) -> proc_macro2::TokenStream,
+		); 3] = &[
+			("actor", crate::actor_internal),
+			("performance", crate::performance_internal),
+			("role", crate::role_internal),
+		];
+
+		for entry in dir {
+			let entry = entry.expect("Can't access {entry}");
+			let typ = entry.file_type().expect("Doesn't have a type??");
+			if typ.is_file() {
+				emulate_attributelike_macro_expansion(
+					fs::File::open(entry.path()).unwrap(),
+					macros,
+				)
+				.unwrap();
+			} else if typ.is_dir() {
+				expand_for_dir(fs::read_dir(entry.path()).unwrap());
+			}
+		}
 	}
 }
