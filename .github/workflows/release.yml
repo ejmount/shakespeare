@@ -1,20 +1,12 @@
 name: Mint Release
 
 on:
-    push:
-      # Sequence of patterns matched against refs/tags
-      tags:
-        - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
-      branches: main
+    workflow_dispatch:
 
 jobs:
-    validate:
-        uses: "./.github/workflows/build.yml"
-
     publish:
         permissions:
             contents: write
-        needs: validate
         runs-on: ubuntu-latest
         steps:
             - name: Checkout sources
@@ -23,10 +15,33 @@ jobs:
                 submodules: true
             - name: Check semver
               uses: obi1kenobi/cargo-semver-checks-action@v2
+              with:
+                exclude: xtask
+
+            - name: Get release tag
+              id: release-tag
+            # Using shell: bash explicitly because it turns on safety features like pipefail
+              shell: bash
+              run: |
+                echo "tag=v$(cargo metadata --format-version 1 | jq '.packages[] | select(.name == "shakespeare").version')" >> "$GITHUB_OUTPUT"
+
+            - name: Check for pre-existing release
+              id: safety
+              env:
+                tag: ${{ steps.release-tag.outputs.tag }}
+                GH_TOKEN: ${{ github.token }}
+              shell: bash
+              run: |
+                if gh release view ${{ env.tag }} >/dev/null 2>&1; then
+                echo "check=false" >> "$GITHUB_OUTPUT"
+                else
+                echo "check=true" >> "$GITHUB_OUTPUT"
+                fi
 
             - name: Create Github Release
               id: create_release
               uses: actions/create-release@v1
+              if: steps.safety.outputs.check == 'true'
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
@@ -35,9 +50,15 @@ jobs:
                 draft: true
                 prerelease: false
 
-            - name: publish crates.io
+            - name: Publish to Crates.io
               run: |
                 cargo publish --dry-run -p shakespeare-macro -p shakespeare --token ${{ secrets.CRATESIO_TOKEN }}
+
+            - name: Tag release
+              shell: bash
+              run: |
+                  git tag -a "v${{ steps.release-tag.outputs.tag }}"
+                  git push --tags
 
 
 
