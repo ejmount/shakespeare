@@ -114,9 +114,10 @@ pub fn actor(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 /// This exists for test coverage purposes.
 fn actor_internal(
-	_attr: proc_macro2::TokenStream,
+	attr: proc_macro2::TokenStream,
 	item: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
+	std::mem::drop(attr); // <-- Removes a clippy warning, because we need this exact signature for tests
 	match parse_macro_input(item) {
 		Ok(module) => match make_actor(module) {
 			Ok(actor_ouput) => actor_ouput.to_token_stream(),
@@ -199,9 +200,11 @@ pub fn performance(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 1. it cannot have any associated constants or types
 /// 2. all functions must be methods and must take either `&self` or `&mut self` as receiver.
 /// 3. all other parameters and all return types must have a lifetime of `'static`
-/// 4. methods cannot have generic parameters, including via `impl Trait` return values
+/// 4. Neither methods nor parameters can have "free" generic parameters, nor `impl Trait` return values. (`Option<u32>` is allowed, `Option<T>` is not)
 ///
-/// Except for these, a role is otherwise a normal trait and its methods can have any number of methods, input parameters, and return values of any type.
+/// Role methods may be async, and if they are, may `await` other futures. However, be aware that the actor's message loop will be blocked while awaiting - this risks deadlocks if other actors have sent it messages and are waiting for the return values. [`send_return_to`][`send_return_to`] may be useful to avoid this situation.
+///
+/// Except for the above restrictions, a role is otherwise a normal trait and its methods can have any number of methods, input parameters, and return values of any type.
 /// (Be aware that extremely large types being passed by value may cause performance impacts - these can be avoided by passing `Box` etc instead)
 #[proc_macro_attribute]
 pub fn role(_attr: TokenStream, item: TokenStream) -> TokenStream {
