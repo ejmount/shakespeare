@@ -82,13 +82,13 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      # Stable toolchain should already be there
-      #- name: Install stable toolchain
-      #  uses: actions-rs/toolchain@v1
-      #  with:
-      #    toolchain: stable
-      #    override: true
-      #    components: llvm-tools-preview
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: llvm-tools-preview
 
       - uses: Swatinem/rust-cache@v1
         with:
