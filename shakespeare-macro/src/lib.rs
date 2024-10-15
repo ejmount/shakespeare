@@ -31,12 +31,12 @@ use syn::parse::Parse;
 use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem, Type};
 use visibility as _;
 
-#[cfg_attr(not(proc_macro), visibility::make(pub))]
+#[cfg_attr(not(proc_macro), visibility::make(pub(crate)))]
 fn make_actor(module: ItemMod) -> Result<ActorOutput> {
 	ActorOutput::new(ActorDecl::new(module)?)
 }
 
-#[cfg_attr(not(proc_macro), visibility::make(pub))]
+#[cfg_attr(not(proc_macro), visibility::make(pub(crate)))]
 fn make_performance(imp: ItemImpl) -> Result<PerfDispatch> {
 	let empty_perf_error = syn::Error::new_spanned(&imp, "Standalone performance needs methods");
 
@@ -65,7 +65,7 @@ fn make_performance(imp: ItemImpl) -> Result<PerfDispatch> {
 	}
 }
 
-#[cfg_attr(not(proc_macro), visibility::make(pub))]
+#[cfg_attr(not(proc_macro), visibility::make(pub(crate)))]
 fn make_role(imp: ItemTrait) -> Result<RoleOutput> {
 	let name = imp.ident;
 	let items = imp.items;
