@@ -50,9 +50,12 @@ jobs:
                 draft: true
                 prerelease: false
 
+
             - name: Publish to Crates.io
-              run: |
-                cargo publish --dry-run -p shakespeare-macro -p shakespeare --token ${{ secrets.CRATESIO_TOKEN }}
+              uses: katyo/publish-crates@v2
+              with:
+                dry-run: true
+                registry-token: ${{ secrets.CRATESIO_TOKEN }}
 
             - name: Tag release
               shell: bash
