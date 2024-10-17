@@ -23,6 +23,7 @@ impl DispatchFunction {
 
 		let fun = fallible_quote! {
 			impl #data_name {
+				#[doc(hidden)]
 				pub async fn #dispatch_method_name(&mut self, msg: ::shakespeare::ReturnEnvelope<dyn #role_name>)  {
 					#[allow(unused_variables)]
 					let ::shakespeare::ReturnEnvelope { payload, return_path } = msg;

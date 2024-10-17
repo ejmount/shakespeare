@@ -20,6 +20,7 @@ impl ActorStruct {
 	pub(crate) fn new(actor: &ActorDecl) -> Result<ActorStruct> {
 		let ActorDecl {
 			actor_name,
+			attributes,
 			performances,
 			actor_vis,
 			panic_handler,
@@ -31,7 +32,9 @@ impl ActorStruct {
 		let fields = map_or_bail!(performances, shell_field_from_performance);
 
 		let strukt = fallible_quote! {
+			#(#attributes)*
 			#actor_vis struct #actor_name {
+				#[doc(hidden)]
 				this: ::std::sync::Weak<Self>,
 				#(#fields),*
 			}
@@ -127,6 +130,7 @@ fn create_inherent_impl(
 		let acccessor_name = role_name.sender_method_name();
 
 		fallible_quote! {
+			#[doc(hidden)]
 			#actor_vis async fn #acccessor_name(&self, payload: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>
 			{
 				self.#field_name.send(payload)
@@ -148,7 +152,7 @@ fn shell_field_from_performance(perf: &PerformanceDecl) -> Result<Field> {
 	let field_name = role_name.queue_name();
 
 	Field::parse_named
-		.parse2(quote! {#field_name : shakespeare::Role2Sender<dyn #role_name> })
+		.parse2(quote! {#[doc(hidden)]  #field_name : shakespeare::Role2Sender<dyn #role_name> })
 		.map_err(|err| {
 			syn::parse::Error::new(err.span(),
 				format!("Parse failure trying to create actor field: {err} - this is a bug, please file an issue")
