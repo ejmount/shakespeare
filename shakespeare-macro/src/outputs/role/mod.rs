@@ -24,6 +24,7 @@ impl RoleOutput {
 			name: role_name,
 			signatures,
 			vis,
+			attributes,
 		} = role;
 		let role_name = RoleName::new(role_name);
 		let payload_type = role_name.payload_path();
@@ -39,9 +40,10 @@ impl RoleOutput {
 		let trait_definition = fallible_quote! {
 			#[::shakespeare::async_trait_export::async_trait]
 			#[allow(dead_code)]
+			#(#attributes)*
 			#vis trait #role_name: 'static + Send + Sync {
 				#(#signatures;)*
-				//fn send(&self, val: #payload_type) -> ::shakespeare::Envelope<dyn #role_name, #return_payload_type>;
+				#[doc(hidden)]
 				async fn enqueue(&self, val: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>;
 			}
 		}?;

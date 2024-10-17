@@ -71,6 +71,7 @@ impl SpawningFunction {
 
 		let constructor: Expr = fallible_quote! {
 			#actor_name {
+				#[doc(hidden)]
 				this: weak.clone(),
 				#(#actor_fields),*
 			}
@@ -88,7 +89,8 @@ impl SpawningFunction {
 
 		let fun: ItemImpl = fallible_quote! {
 			impl #actor_name {
-				pub fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
+				/// Creates a new Actor
+				fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
 					use ::shakespeare::{ActorSpawn, Channel, catch_future, tokio_export as tokio};
 					use ::std::sync::Arc;
 					use tokio::{select, pin};
