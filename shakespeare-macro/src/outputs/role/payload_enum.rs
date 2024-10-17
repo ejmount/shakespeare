@@ -59,9 +59,9 @@ impl PayloadEnum {
 		role_name: &RoleName,
 	) -> Result<ItemImpl> {
 		fallible_quote! {
-			impl ::shakespeare::Accepts<#(#types),*> for dyn #role_name {
+			impl ::shakespeare::Accepts<(#(#types),*)> for dyn #role_name {
 				#[allow(unused_parens)]
-				fn into_payload(value: #(#types),*) -> Self::Payload {
+				fn into_payload(value: (#(#types),*)) -> Self::Payload {
 					Self::Payload::#name ( (value) )
 				}
 			}
@@ -151,7 +151,7 @@ impl ReturnPayload {
 				#[allow(unreachable_patterns)]
 				fn from_return_payload(value: Self::Return) -> #typ {
 					#[allow(irrefutable_let_patterns)]
-					if let #(|Self::Return::#idents(val)),* = value {
+					if let #(Self::Return::#idents(val))|* = value {
 						val
 					}
 					else {
