@@ -39,7 +39,7 @@ pub use core::{
 	Sender as RoleSender,
 };
 
-use futures::Stream;
+use futures::{pin_mut, Stream, StreamExt};
 
 #[doc(hidden)]
 pub type Role2Payload<R> = <R as Role>::Payload;
@@ -65,7 +65,7 @@ where
 ///
 /// The type constraints ensure that it is unambigious which method handler this will dispatch to.
 ///
-/// This function does not do anything to inform the actor when the stream closes, successfuly or otherwise.
+/// This function does not do anything to inform the actor when the stream closes, successfuly or otherwise. If sending the message to the actor fails, the stream will be dropped.
 ///
 /// **N.B**: this function retains the `Arc<dyn Role>` for as long as the stream is still active, and will keep the actor alive for that time.
 pub fn send_stream_to<R, S>(stream: S, actor: Arc<R>)
@@ -74,18 +74,18 @@ where
 	S: Stream + Send + 'static,
 	<S as Stream>::Item: Send,
 {
-	use futures::StreamExt;
 	tokio_export::spawn(async move {
-		stream
-			.for_each(|msg| async {
-				let payload = R::into_payload(msg);
-				let envelope = ReturnEnvelope {
-					payload,
-					return_path: ReturnPath::Discard,
-				};
-				let _ = actor.enqueue(envelope).await;
-			})
-			.await;
+		pin_mut!(stream);
+		while let Some(msg) = stream.next().await {
+			let payload = R::into_payload(msg);
+			let envelope = ReturnEnvelope {
+				payload,
+				return_path: ReturnPath::Discard,
+			};
+			if actor.enqueue(envelope).await.is_err() {
+				break;
+			}
+		}
 	});
 }
 
