@@ -18,6 +18,7 @@ enum ActorInternal {
 
 pub(crate) struct ActorDecl {
 	pub(crate) actor_name:    ActorName,
+	pub(crate) attributes:    Vec<Attribute>,
 	pub(crate) actor_vis:     Visibility,
 	pub(crate) data_item:     DataItem,
 	pub(crate) panic_handler: Option<ItemFn>,
@@ -115,9 +116,17 @@ impl ActorDecl {
 		// [SpawningFunction] might fall over otherwise
 		// And also doesn't make much sense
 
+		let attributes = module
+			.attrs
+			.iter()
+			.filter(is_not_internal_attribute)
+			.cloned()
+			.collect();
+
 		Ok(ActorDecl {
 			actor_name,
 			actor_vis: module.vis,
+			attributes,
 			data_item,
 			panic_handler,
 			exit_handler,
@@ -156,11 +165,33 @@ fn read_performance(item: &Item) -> Fallible<ActorInternal> {
 			.map(|f| &f.sig)
 			.cloned();
 
-		let role = RoleDecl::new(role_name.clone(), parse_quote! {pub}, signatures);
+		let attributes = imp
+			.attrs
+			.iter()
+			.filter(is_not_internal_attribute)
+			.cloned()
+			.collect();
+
+		let role = RoleDecl::new(
+			role_name.clone(),
+			attributes,
+			parse_quote! {pub},
+			signatures,
+		);
 		Ok(ActorInternal::CanonPerformance(perf, role).into())
 	} else {
 		Ok(ActorInternal::Performance(perf).into())
 	}
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_not_internal_attribute(a: &&Attribute) -> bool {
+	let Some(last) = a.path().segments.last() else {
+		return true;
+	};
+	let ident = &last.ident;
+
+	!(ident == "actor" || ident == "performance" || ident == "role")
 }
 
 #[allow(clippy::unnecessary_wraps)]

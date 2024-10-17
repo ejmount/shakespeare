@@ -17,12 +17,18 @@ impl SelfGetter {
 
 		let statik_item: Item = fallible_quote! {
 			::shakespeare::tokio_export::task_local! {
+				#[doc(hidden)]
 				static #getter_item: ::std::sync::Arc<#actor_name>;
 			}
 		}?;
 
 		let data_getter: Item = fallible_quote! {
 			impl #data_name {
+				/// Gets a reference to the running actor
+				///
+				/// # Panics
+				/// Will panic if called from outside a performance of an actor of the appropriate type. (However, which instance it's called on doesn't matter.)
+				///
 				#[allow(dead_code)]
 				pub fn get_shell(&self) -> ::std::sync::Arc<#actor_name> {
 					#getter_item.with(Clone::clone)
@@ -32,6 +38,8 @@ impl SelfGetter {
 
 		let actor_getter: Item = fallible_quote! {
 			impl #actor_name {
+				#[doc(hidden)]
+				// Used internally for creating Envelopes
 				pub fn get_shell(&self) -> ::std::sync::Arc<#actor_name> {
 					self.this.upgrade().expect("Dead actor?")
 				}

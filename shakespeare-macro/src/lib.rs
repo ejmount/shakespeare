@@ -67,12 +67,17 @@ fn make_performance(imp: ItemImpl) -> Result<PerfDispatch> {
 
 #[cfg_attr(not(proc_macro), visibility::make(pub(crate)))]
 fn make_role(imp: ItemTrait) -> Result<RoleOutput> {
-	let name = imp.ident;
-	let items = imp.items;
-	let vis = imp.vis;
+	let ItemTrait {
+		ident: name,
+		attrs,
+		items,
+		vis,
+		..
+	} = imp;
+
 	let signatures = filter_unwrap!(items, TraitItem::Fn).map(|f| f.sig);
 
-	let decl = RoleDecl::new(parse_quote! { #name }, vis, signatures);
+	let decl = RoleDecl::new(parse_quote! { #name }, attrs, vis, signatures);
 
 	RoleOutput::new(decl)
 }

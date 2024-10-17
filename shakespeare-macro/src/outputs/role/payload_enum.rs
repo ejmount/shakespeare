@@ -27,6 +27,7 @@ impl PayloadEnum {
 
 		let definition = fallible_quote! {
 			#[allow(unused_parens)]
+			#[doc(hidden)]
 			pub enum #payload_type { #(#variants),* }
 		}?;
 
@@ -61,6 +62,7 @@ impl PayloadEnum {
 		fallible_quote! {
 			impl ::shakespeare::Accepts<(#(#types),*)> for dyn #role_name {
 				#[allow(unused_parens)]
+				#[doc(hidden)]
 				fn into_payload(value: (#(#types),*)) -> Self::Payload {
 					Self::Payload::#name ( (value) )
 				}
@@ -110,6 +112,7 @@ impl ReturnPayload {
 
 		let definition = fallible_quote! {
 			#[allow(unused_parens)]
+			#[doc(hidden)]
 			pub enum #return_payload_type { #(#variants),* }
 		}?;
 
@@ -149,6 +152,7 @@ impl ReturnPayload {
 		fallible_quote! {
 			impl ::shakespeare::Emits<#typ> for dyn #role_name {
 				#[allow(unreachable_patterns)]
+				#[doc(hidden)]
 				fn from_return_payload(value: Self::Return) -> #typ {
 					#[allow(irrefutable_let_patterns)]
 					if let #(Self::Return::#idents(val))|* = value {

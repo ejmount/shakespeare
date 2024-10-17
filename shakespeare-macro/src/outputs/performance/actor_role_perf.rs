@@ -30,9 +30,7 @@ impl ActorPerf {
 			#[::shakespeare::async_trait_export::async_trait] // Can't be removed because it makes the trait not obj-safe
 			impl #role_name for #actor_path {
 				#(#sending_methods)*
-				/*fn send(&self, val: shakespeare::Role2Payload<dyn #role_name>) -> ::shakespeare::Envelope<dyn #role_name, #return_payload_type> {
-					::shakespeare::Envelope::new(val, self.get_shell())
-				}*/
+				#[doc(hidden)]
 				async fn enqueue(&self, val: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>{
 					self.#sender_name(val).await
 				}
@@ -54,6 +52,7 @@ fn create_sending_method(
 	fun: &FunctionItem,
 	role_name: &RoleName,
 ) -> Result<FunctionItem> {
+	let attributes = fun.attrs.iter();
 	let Signature {
 		ident,
 		inputs,
@@ -73,6 +72,7 @@ fn create_sending_method(
 	let fn_block = fallible_quote! {
 		#[allow(unused_parens)]
 		#[allow(dead_code)]
+		#(#attributes)*
 		fn #ident(&self, #(#params),*) -> ::shakespeare::Envelope<dyn #role_name, #return_type> {
 			let msg = (#(#patterns),*);
 			let payload = #payload_type::#variant_name(msg);
