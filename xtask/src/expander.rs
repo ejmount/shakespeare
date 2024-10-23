@@ -122,15 +122,22 @@ pub fn expand_all_tests() -> Result<(), Error> {
 	use std::path::PathBuf;
 	use std::process::{Command, Stdio};
 
-	let src = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("../tests/");
+	let root = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("..");
+	let src = root.join("tests/");
+	let macro_src = root.join("shakespeare-macro/tests/");
 	let dest = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("tests/expanded/");
 
-	for test_file in walkdir::WalkDir::new(&src).into_iter().filter_entry(|f| {
-		f.metadata().unwrap().is_dir() || f.path().extension().is_some_and(|p| p == "rs")
-	}) {
+	let main_test_files = walkdir::WalkDir::new(&src)
+		.into_iter()
+		.filter_entry(is_a_rust_file);
+	let macro_test_files = walkdir::WalkDir::new(&macro_src)
+		.into_iter()
+		.filter_entry(is_a_rust_file);
+
+	for test_file in main_test_files.chain(macro_test_files) {
 		let test_file = test_file?;
 
-		let new_path = dest.join(test_file.path().strip_prefix(&src)?);
+		let new_path = dest.join(test_file.path().strip_prefix(&root)?);
 
 		if test_file.metadata()?.is_dir() {
 			create_dir_all(&new_path).unwrap_or_else(|_| panic!("{new_path:?} invalid to create"));
@@ -168,4 +175,8 @@ pub fn expand_all_tests() -> Result<(), Error> {
 		std::fs::write(new_path, output)?;
 	}
 	Ok(())
+}
+
+fn is_a_rust_file(f: &walkdir::DirEntry) -> bool {
+	f.metadata().unwrap().is_dir() || f.path().extension().is_some_and(|p| p == "rs")
 }
