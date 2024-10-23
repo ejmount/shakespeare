@@ -14,7 +14,7 @@ impl RoleName {
 		RoleName(p)
 	}
 
-	fn path_leaf(&self) -> String {
+	pub(crate) fn path_leaf(&self) -> String {
 		self.0.segments.last().as_ref().unwrap().ident.to_string()
 	}
 
