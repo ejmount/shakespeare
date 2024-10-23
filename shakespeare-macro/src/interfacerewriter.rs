@@ -1,7 +1,7 @@
 use syn::fold::Fold;
 use syn::{parse_quote, Block, Receiver, ReturnType};
 
-use crate::data::RoleName;
+use crate::data::{remove_context_param, RoleName};
 
 /// Rewrites the plain method from a role/performance block to have the correct signature for the actor wrapper.
 /// Can be called on either bare signatures or methods, so we can't fill in the body at this point
@@ -26,11 +26,14 @@ impl Fold for InterfaceRewriter<'_> {
 		let role_name = self.role_name;
 
 		sig.asyncness = None;
-		let old_return = if let ReturnType::Type(_, ret) = sig.output {
+		let old_return = if let ReturnType::Type(_, ret) = &sig.output {
 			(*ret).clone()
 		} else {
 			parse_quote!(())
 		};
+
+		remove_context_param(&mut sig);
+
 		sig.output = parse_quote!(
 			-> ::shakespeare::Envelope<dyn #role_name, #old_return>
 		);

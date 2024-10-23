@@ -59,11 +59,11 @@ impl SpawningFunction {
 
 		let select_branches = map_or_bail!(
 			izip!(performances, &output_field_names),
-			|(role, output)| -> Result<TokenStream> {
-				let fn_name = role.role_name.method_name();
-				fallible_quote! { Some(msg) = #output.recv(), if !(#output.is_empty() && outstanding_clients == 1) => {
+			|(perf, output)| -> Result<TokenStream> {
+				let fn_name = perf.role_name.method_name();
+				fallible_quote! { Some(msg) = #output.recv(), if !(#output.is_empty() && !context.sustains()) => {
 					timeout_sleep.as_mut().reset(Instant::now() + IDLE_TIMEOUT);
-					state.#fn_name(msg).await
+					state.#fn_name(&mut context, msg).await
 				} }
 			}
 		);
@@ -71,7 +71,6 @@ impl SpawningFunction {
 
 		let constructor: Expr = fallible_quote! {
 			#actor_name {
-				#[doc(hidden)]
 				this: weak.clone(),
 				#(#actor_fields),*
 			}
@@ -85,13 +84,11 @@ impl SpawningFunction {
 			.map(|p| fallible_quote! { let result = result.map(|_| #p(state)); })
 			.transpose()?;
 
-		let getter_name = actor_name.get_static_item_name();
-
 		let fun: ItemImpl = fallible_quote! {
 			impl #actor_name {
 				/// Creates a new Actor
 				fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
-					use ::shakespeare::{ActorSpawn, Channel, catch_future, tokio_export as tokio};
+					use ::shakespeare::{ActorSpawn, Channel, Context, catch_future, tokio_export as tokio};
 					use ::std::sync::Arc;
 					use tokio::{select, pin};
 					use tokio::time::{sleep, Duration, Instant};
@@ -102,17 +99,17 @@ impl SpawningFunction {
 					let actor = Arc::new_cyclic(|weak| { #constructor });
 					let stored_actor = Arc::clone(&actor);
 
+					let mut context = Context::new(stored_actor);
+
 					let event_loop = async move {
 						let loop_lambda = async {
 							let timeout_sleep = sleep(IDLE_TIMEOUT);
 							pin!(timeout_sleep);
 							loop {
-								let outstanding_clients = #getter_name.with(Arc::strong_count);
 								select! {
 									#(#select_branches),*
-									_ = &mut timeout_sleep, if outstanding_clients > 1 => {
-										let outstanding_clients = #getter_name.with(Arc::strong_count);
-										if outstanding_clients == 1 {
+									_ = &mut timeout_sleep, if context.sustains() => {
+										if !context.sustains() {
 											break;
 										}
 										else {
@@ -124,13 +121,15 @@ impl SpawningFunction {
 							}
 						};
 
+
+
 						// SAFETY: The receive handles inside the branches are not safe to unwind
 						// But they're consumed by the closure, so we can never see them
 						// The senders might interact with a dead receiver though.
 						// If we assume that a panic will not happen **during** an operation on the receiver,
 						// then the control block will still be consistent at any point the sender looks at it
 						// even if the receiver was destroyed
-						let guarded_future = catch_future(#getter_name.scope(stored_actor, loop_lambda));
+						let guarded_future = catch_future(loop_lambda);
 
 						let result = guarded_future.await;
 

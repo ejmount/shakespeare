@@ -2,7 +2,7 @@ use itertools::Itertools;
 use quote::ToTokens;
 use syn::{parse_quote, FnArg, ItemImpl, Path, Result, ReturnType, Signature};
 
-use crate::data::{ActorName, FunctionItem, RoleName};
+use crate::data::{remove_context_param, ActorName, FunctionItem, RoleName};
 use crate::declarations::make_variant_name;
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
@@ -53,12 +53,16 @@ fn create_sending_method(
 	role_name: &RoleName,
 ) -> Result<FunctionItem> {
 	let attributes = fun.attrs.iter();
+
+	let mut sig = fun.sig.clone();
+
+	remove_context_param(&mut sig);
 	let Signature {
 		ident,
 		inputs,
 		output,
 		..
-	} = &fun.sig;
+	} = &sig;
 	let params = filter_unwrap!(inputs, FnArg::Typed).collect_vec();
 	let patterns = params.iter().map(|t| &(*t.pat)).collect_vec();
 	let variant_name = make_variant_name(fun);

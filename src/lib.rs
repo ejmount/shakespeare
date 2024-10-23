@@ -35,7 +35,7 @@ pub use core::{
 };
 #[doc(hidden)]
 pub use core::{
-	Channel, Receiver as RoleReceiver, ReturnCaster, ReturnEnvelope, ReturnPath,
+	Channel, Context, Receiver as RoleReceiver, ReturnCaster, ReturnEnvelope, ReturnPath,
 	Sender as RoleSender,
 };
 

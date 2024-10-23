@@ -2,7 +2,7 @@ use convert_case::{Case, Casing};
 use itertools::Itertools;
 use quote::format_ident;
 use structmeta::{Flag, StructMeta};
-use syn::{Error, Generics, Ident, ImplItem, ItemImpl, Path, Result};
+use syn::{Error, Ident, ImplItem, ItemImpl, Path, Result};
 
 use crate::data::{FunctionItem, RoleName};
 use crate::macros::filter_unwrap;
@@ -22,9 +22,8 @@ impl PerformanceDecl {
 		assert!(!role_name.segments.is_empty());
 
 		let handlers = filter_unwrap!(imp.items, ImplItem::Fn).collect_vec();
-		let nongeneric = Generics::default();
 		for handler in &handlers {
-			if handler.sig.generics != nongeneric {
+			if handler.sig.generics.type_params().next().is_some() {
 				Err(Error::new_spanned(
 					&handler.sig,
 					"Generic performances are not supported",
