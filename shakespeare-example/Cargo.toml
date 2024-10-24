@@ -1,0 +1,14 @@
+[package]
+name = "shakespeare-example"
+version = "0.0.0"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio-util = { version = "0.7.12", features = ["codec"] }
+shakespeare = { path = ".." }
+tokio = { version = "1.40.0", features = ["net"] }
+futures = "0.3.31"
+tokio-stream = { version = "0.1.16", features = ["net"] }
