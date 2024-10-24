@@ -26,3 +26,5 @@ futures = "0.3.31"
 runtime-macros = "1.1.0"
 shakespeare = { path = ".." }
 tokio = "1.40.0"
+tokio-stream = { version = "0.1.16", features = ["net"] }
+tokio-util = { version = "0.7.12", features = ["codec", "net"] }
