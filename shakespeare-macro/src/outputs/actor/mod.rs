@@ -47,7 +47,7 @@ impl ActorOutput {
 		let panic_name = panic_handler.as_ref().map(|i| i.sig.ident.clone());
 		let exit_name = exit_handler.as_ref().map(|i| i.sig.ident.clone());
 
-		let getter = SelfGetter::new(&actor_name, &data_name)?;
+		let getter = SelfGetter::new(&actor_name)?;
 
 		assert!(!performances.is_empty());
 		let sf = SpawningFunction::new(
