@@ -3,8 +3,9 @@ use convert_case::Casing;
 use itertools::{Either, Itertools};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
+use syn::parse::Parser;
 use syn::spanned::Spanned;
-use syn::{Arm, Expr, ItemImpl, Path, Result};
+use syn::{Arm, Attribute, Expr, Ident, ItemImpl, Path, Result};
 
 use crate::data::{needs_context, DataName, FunctionItem, MethodName, PayloadPath, RoleName};
 use crate::declarations::make_variant_name;
@@ -23,6 +24,11 @@ impl DispatchFunction {
 		dispatch_method_name: &MethodName,
 		handlers: &[FunctionItem],
 	) -> Result<DispatchFunction> {
+		let hide_doc: Attribute = Attribute::parse_outer
+			.parse2(quote!(#[doc(hidden)]))?
+			.pop()
+			.unwrap();
+
 		let dispatch_with_payload = |fun| dispatch_case(role_name, payload_type, fun);
 
 		let arms: Vec<_> = map_or_bail!(&handlers, dispatch_with_payload);
@@ -31,8 +37,8 @@ impl DispatchFunction {
 			.iter()
 			.map(|h| {
 				let mut h = h.clone();
-				let new = format!("{}_{}", role_name.path_leaf(), h.sig.ident).to_case(Snake);
-				h.sig.ident = format_ident!("{}", new);
+				h.sig.ident = make_method_name(role_name, &h.sig.ident);
+				h.attrs.push(hide_doc.clone());
 				h
 			})
 			.collect_vec();
@@ -67,6 +73,11 @@ impl ToTokens for DispatchFunction {
 	}
 }
 
+fn make_method_name(role_name: &RoleName, old_ident: &Ident) -> Ident {
+	let new = format!("{}_{}", role_name.path_leaf(), old_ident).to_case(Snake);
+	format_ident!("{}", new)
+}
+
 fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) -> Result<Arm> {
 	let mut num_parameters = fun.sig.inputs.len();
 	if needs_context(&fun.sig) {
@@ -88,10 +99,7 @@ fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) 
 
 	let variant_name = make_variant_name(fun);
 
-	let fn_name = format_ident!(
-		"{}",
-		format!("{}_{}", role_name.path_leaf(), &fun.sig.ident).to_case(Snake)
-	);
+	let fn_name = make_method_name(role_name, &fun.sig.ident);
 	let asyncness: Option<TokenStream> = fun.sig.asyncness.is_some().then_some(quote!(.await));
 
 	let into_call: Expr = fallible_quote! {
@@ -101,6 +109,4 @@ fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) 
 	fallible_quote! {
 		#payload_type::#variant_name ((#(#names),*)) => { #into_call }
 	}
-
-	//#payload_type::#variant_name ((#(#names),*)) => { #into_call }
 }

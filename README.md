@@ -66,6 +66,10 @@ async fn main() {
 }
 ```
 
+## Compatibility
+
+If you directly browse this crate's source code, you will come across functions marked `pub` but also `#[doc(hidden)]`. This is because the macros used in Shakespeare generate output code that then calls into these library functions. These calls technically originate from the *user's* crate, which means the called functions need to be `pub` to resolve. However, they are nonetheless not intended for direct client use, so they are suppressed from the documentation and __are exempt from SemVer__ - code bypassing documented interfaces may break even in patch releases.
+
 ## Licence
 
 Licensed under either of [Apache Licence, Version 2.0](LICENSE-APACHE) or [MIT licence](LICENSE-MIT) at your option.
