@@ -1,9 +1,7 @@
-use convert_case::{Case, Casing};
 use itertools::Itertools;
-use quote::format_ident;
 use syn::{parse_quote, Attribute, Error, ImplItem, Item, ItemFn, ItemImpl, ItemMod, Visibility};
 
-use crate::data::{ActorName, DataItem};
+use crate::data::{ActorName, DataItem, HandlerFunctions};
 use crate::declarations::performance::PerformanceAttribute;
 use crate::macros::{fallible_quote, filter_unwrap};
 use crate::{PerformanceDecl, RoleDecl};
@@ -17,15 +15,14 @@ enum ActorInternal {
 }
 
 pub(crate) struct ActorDecl {
-	pub(crate) actor_name:    ActorName,
-	pub(crate) attributes:    Vec<Attribute>,
-	pub(crate) actor_vis:     Visibility,
-	pub(crate) data_item:     DataItem,
-	pub(crate) panic_handler: Option<ItemFn>,
-	pub(crate) exit_handler:  Option<ItemFn>,
-	pub(crate) performances:  Vec<PerformanceDecl>,
-	pub(crate) roles:         Vec<RoleDecl>,
-	pub(crate) misc:          Vec<Item>,
+	pub(crate) actor_name:   ActorName,
+	pub(crate) attributes:   Vec<Attribute>,
+	pub(crate) actor_vis:    Visibility,
+	pub(crate) data_item:    DataItem,
+	pub(crate) handlers:     HandlerFunctions,
+	pub(crate) performances: Vec<PerformanceDecl>,
+	pub(crate) roles:        Vec<RoleDecl>,
+	pub(crate) misc:         Vec<Item>,
 }
 
 type Fallible<T> = Result<Option<T>, Error>;
@@ -102,14 +99,14 @@ impl ActorDecl {
 		let actor_ident = &module.ident;
 		let actor_name = ActorName::new(fallible_quote! { #actor_ident }?);
 
-		// Replace this with an impl block so we don't have to disambigate
-		if let Some(handler) = panic_handler.as_mut() {
-			let s = format!("{}_{}", actor_ident, handler.sig.ident);
-			handler.sig.ident = format_ident!("{}", s.to_case(Case::Snake));
+		let mut handlers = HandlerFunctions::new(data_item.name());
+
+		// Make this less redundant
+		if let Some(handler) = panic_handler {
+			handlers.add(handler)?;
 		}
-		if let Some(handler) = exit_handler.as_mut() {
-			let s = format!("{}_{}", actor_ident, handler.sig.ident);
-			handler.sig.ident = format_ident!("{}", s.to_case(Case::Snake));
+		if let Some(handler) = exit_handler {
+			handlers.add(handler)?;
 		}
 
 		assert!(!performances.is_empty(), "Empty perfs");
@@ -128,8 +125,7 @@ impl ActorDecl {
 			actor_vis: module.vis,
 			attributes,
 			data_item,
-			panic_handler,
-			exit_handler,
+			handlers,
 			performances,
 			roles,
 			misc,
