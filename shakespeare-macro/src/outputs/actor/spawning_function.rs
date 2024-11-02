@@ -18,8 +18,8 @@ impl SpawningFunction {
 		actor_name: &ActorName,
 		data_name: &DataName,
 		performances: &[PerformanceDecl],
-		panic_name: Option<Ident>,
-		exit_name: Option<Ident>,
+		panic_name: Option<&Ident>,
+		exit_name: Option<&Ident>,
 	) -> Result<SpawningFunction> {
 		let field_names = performances
 			.iter()
@@ -76,13 +76,15 @@ impl SpawningFunction {
 			}
 		}?;
 
-		let run_panic_handler: Option<syn::Stmt> = panic_name
-			.map(|p| fallible_quote! { let result = result.map_err(#p); })
-			.transpose()?;
+		let run_panic_handler: syn::Expr = panic_name
+			.map(|p| fallible_quote! { state.#p(panic) })
+			.transpose()?
+			.unwrap_or(fallible_quote! { panic }?);
 
-		let run_exit_handler: Option<syn::Stmt> = exit_name
-			.map(|p| fallible_quote! { let result = result.map(|_| #p(state)); })
-			.transpose()?;
+		let run_exit_handler: syn::Expr = exit_name
+			.map(|p| fallible_quote! { state.#p()})
+			.transpose()?
+			.unwrap_or(fallible_quote! { () }?);
 
 		let fun: ItemImpl = fallible_quote! {
 			impl #actor_name {
@@ -133,9 +135,12 @@ impl SpawningFunction {
 
 						let result = guarded_future.await;
 
-						#run_panic_handler
-						#run_exit_handler
-						result
+						match result {
+							Ok(_) => { Ok(#run_exit_handler) },
+							Err(panic) => Err(#run_panic_handler)
+						}
+
+
 					};
 
 					let join_handle = tokio::task::spawn(event_loop);
