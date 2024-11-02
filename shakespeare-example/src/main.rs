@@ -1,28 +1,33 @@
-#![warn(missing_docs)]
-
 //! This is an example shakespeare program that runs an all-to-all chatroom on telnet port 8000.
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
 use shakespeare::{actor, send_future_to, send_stream_to, ActorOutcome, ActorSpawn, Context};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::wrappers::TcpListenerStream;
-use tokio_util::codec::{FramedRead, FramedWrite, LinesCodec, LinesCodecError};
+use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 
 static ID_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
 
 /// Docstring for the Client actor
 #[actor]
 mod Client {
+	/// Hello
 	struct UserState {
 		id:         usize,
 		relay:      Arc<dyn MsgRelay>,
-		out_stream: FramedWrite<tokio::net::tcp::OwnedWriteHalf, LinesCodec>,
+		out_stream: SplitSink<Framed<TcpStream, LinesCodec>, String>,
 	}
 
-	fn stop(s: UserState) -> usize {
-		s.id
+	fn stop(self) -> usize {
+		self.id
+	}
+
+	fn catch(self, _err: Box<dyn Any + Send>) -> usize {
+		self.id
 	}
 
 	/// This is a trait for actors that interact with a network socket
@@ -51,10 +56,8 @@ mod Client {
 impl Client {
 	/// Create a new Client from a socket, which will then send incoming messages to the relay.
 	pub fn new(relay: Arc<dyn MsgRelay>, client: TcpStream, id: usize) -> Arc<Client> {
-		let (in_stream, out_stream) = client.into_split();
-
-		let codec_writer = FramedWrite::new(out_stream, LinesCodec::new());
-		let codec_reader = FramedRead::new(in_stream, LinesCodec::new());
+		let framed = Framed::new(client, LinesCodec::new());
+		let (out_stream, in_stream) = framed.split();
 
 		let ActorSpawn {
 			msg_handle,
@@ -63,9 +66,9 @@ impl Client {
 		} = Client::start(UserState {
 			id,
 			relay: relay.clone(),
-			out_stream: codec_writer,
+			out_stream,
 		});
-		send_stream_to::<dyn NetClient, _>(codec_reader, msg_handle.clone());
+		send_stream_to::<dyn NetClient, _>(in_stream, msg_handle.clone());
 		send_future_to(join_handle, relay);
 
 		msg_handle
@@ -120,11 +123,7 @@ mod Server {
 
 	#[performance(canonical)]
 	impl NetListener for ServerState {
-		async fn listen<'a>(
-			&mut self,
-			ctx: &'a mut shakespeare::Context<ServerState>,
-			tcp_client: TcpStream,
-		) {
+		async fn listen<'a>(&mut self, ctx: &'a mut Context<ServerState>, tcp_client: TcpStream) {
 			let id = ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
 			let actor = Client::new(ctx.get_shell(), tcp_client, id);
 			self.users.insert(id, actor);
