@@ -80,7 +80,7 @@ fn make_method_name(role_name: &RoleName, old_ident: &Ident) -> Ident {
 
 fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) -> Result<Arm> {
 	let mut num_parameters = fun.sig.inputs.len();
-	if fun.sig.needs_context() {
+	if fun.sig.has_context_input() {
 		num_parameters -= 1;
 	}
 	if num_parameters == 0 {
@@ -91,7 +91,7 @@ fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) 
 	}
 	let names = (0..num_parameters - 1).map(|n| format_ident!("_{n}"));
 
-	let call_params = if fun.sig.needs_context() {
+	let call_params = if fun.sig.has_context_input() {
 		Either::Left(std::iter::once(format_ident!("context")).chain(names.clone()))
 	} else {
 		Either::Right(names.clone())
