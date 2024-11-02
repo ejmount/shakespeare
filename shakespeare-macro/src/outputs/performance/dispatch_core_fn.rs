@@ -7,7 +7,7 @@ use syn::parse::Parser;
 use syn::spanned::Spanned;
 use syn::{Arm, Attribute, Expr, Ident, ItemImpl, Path, Result};
 
-use crate::data::{needs_context, DataName, FunctionItem, MethodName, PayloadPath, RoleName};
+use crate::data::{DataName, FunctionItem, MethodName, PayloadPath, RoleName, SignatureExt};
 use crate::declarations::make_variant_name;
 use crate::macros::{fallible_quote, map_or_bail};
 
@@ -80,7 +80,7 @@ fn make_method_name(role_name: &RoleName, old_ident: &Ident) -> Ident {
 
 fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) -> Result<Arm> {
 	let mut num_parameters = fun.sig.inputs.len();
-	if needs_context(&fun.sig) {
+	if fun.sig.needs_context() {
 		num_parameters -= 1;
 	}
 	if num_parameters == 0 {
@@ -91,7 +91,7 @@ fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) 
 	}
 	let names = (0..num_parameters - 1).map(|n| format_ident!("_{n}"));
 
-	let call_params = if needs_context(&fun.sig) {
+	let call_params = if fun.sig.needs_context() {
 		Either::Left(std::iter::once(format_ident!("context")).chain(names.clone()))
 	} else {
 		Either::Right(names.clone())

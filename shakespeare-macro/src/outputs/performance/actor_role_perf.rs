@@ -2,7 +2,7 @@ use itertools::Itertools;
 use quote::ToTokens;
 use syn::{parse_quote, FnArg, ItemImpl, Path, Result, ReturnType, Signature};
 
-use crate::data::{remove_context_param, ActorName, FunctionItem, RoleName};
+use crate::data::{ActorName, FunctionItem, RoleName, SignatureExt};
 use crate::declarations::make_variant_name;
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
@@ -56,7 +56,7 @@ fn create_sending_method(
 
 	let mut sig = fun.sig.clone();
 
-	remove_context_param(&mut sig);
+	sig.remove_context_param();
 	let Signature {
 		ident,
 		inputs,

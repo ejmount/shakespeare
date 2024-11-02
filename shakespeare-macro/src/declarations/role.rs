@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use syn::{Attribute, Path, Signature, Visibility};
 
-use crate::data::remove_context_param;
+use crate::data::SignatureExt;
 
 pub(crate) struct RoleDecl {
 	pub(crate) name:       Path,
@@ -19,7 +19,9 @@ impl RoleDecl {
 	) -> RoleDecl {
 		let mut signatures = signatures.collect_vec();
 
-		signatures.iter_mut().for_each(remove_context_param);
+		signatures
+			.iter_mut()
+			.for_each(SignatureExt::remove_context_param);
 
 		RoleDecl {
 			name,
