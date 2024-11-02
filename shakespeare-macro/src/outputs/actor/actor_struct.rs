@@ -1,11 +1,9 @@
 use itertools::Itertools;
 use quote::{quote, ToTokens};
 use syn::parse::Parser;
-use syn::{
-	Field, ImplItem, ItemFn, ItemImpl, ItemStruct, Result, ReturnType, Signature, Visibility,
-};
+use syn::{Field, ImplItem, ItemImpl, ItemStruct, Result, Visibility};
 
-use crate::data::{ActorName, DataName, RoleName};
+use crate::data::{ActorName, DataName, FuncReturnType, RoleName};
 use crate::declarations::{ActorDecl, PerformanceDecl};
 use crate::macros::{fallible_quote, map_or_bail};
 
@@ -23,8 +21,7 @@ impl ActorStruct {
 			attributes,
 			performances,
 			actor_vis,
-			panic_handler,
-			exit_handler,
+			handlers,
 			data_item,
 			..
 		} = actor;
@@ -47,9 +44,9 @@ impl ActorStruct {
 
 		let sender_method_name_impl = create_inherent_impl(&role_names, actor_vis, actor_name)?;
 
-		let meta_trait = create_meta_trait_impl(
-			panic_handler.as_ref(),
-			exit_handler.as_ref(),
+		let meta_traits = create_meta_trait_impl(
+			handlers.panic_return(),
+			handlers.exit_return(),
 			actor_name,
 			&data_item.name(),
 		)?;
@@ -57,7 +54,7 @@ impl ActorStruct {
 		Ok(ActorStruct {
 			strukt,
 			sender_method_name_impl,
-			meta_traits: meta_trait,
+			meta_traits,
 		})
 	}
 }
@@ -71,38 +68,11 @@ impl ToTokens for ActorStruct {
 }
 
 fn create_meta_trait_impl(
-	panic_handler: Option<&ItemFn>,
-	exit_handler: Option<&ItemFn>,
+	panic_return: FuncReturnType,
+	exit_return: FuncReturnType,
 	actor_name: &ActorName,
 	data_name: &DataName,
 ) -> Result<[ItemImpl; 2]> {
-	let unit_type = fallible_quote!(())?;
-	let panic_type = fallible_quote!(std::boxed::Box<dyn std::any::Any + std::marker::Send>)?;
-
-	let panic_return = match panic_handler.as_ref() {
-		Some(ItemFn {
-			sig: Signature {
-				output: ReturnType::Type(_, b),
-				..
-			},
-			..
-		}) => &**b,
-		Some(_) => &unit_type,
-		None => &panic_type,
-	};
-	let exit_return = if let Some(ItemFn {
-		sig: Signature {
-			output: ReturnType::Type(_, b),
-			..
-		},
-		..
-	}) = exit_handler.as_ref()
-	{
-		&**b
-	} else {
-		&unit_type
-	};
-
 	let actor_trait = fallible_quote! {
 		impl ::shakespeare::ActorShell for #actor_name {
 			type StateType = #data_name;
