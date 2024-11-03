@@ -29,6 +29,12 @@ impl PerformanceDecl {
 					"Generic performances are not supported",
 				))?;
 			}
+			if !matches!(handler.sig.inputs.first(), Some(syn::FnArg::Receiver(_))) {
+				Err(Error::new_spanned(
+					&handler.sig,
+					"Performance method must have self-receiver",
+				))?;
+			}
 		}
 
 		let role_name = RoleName::new(role_name);
