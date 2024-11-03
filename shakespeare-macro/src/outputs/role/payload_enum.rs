@@ -1,13 +1,9 @@
-use convert_case::{Case, Casing};
 use itertools::Itertools;
-use quote::{format_ident, ToTokens};
-use syn::{
-	parse_quote, FnArg, Ident, ItemEnum, ItemImpl, Path, Result, ReturnType, Signature, Type,
-	Variant,
-};
+use quote::ToTokens;
+use syn::{Ident, ItemEnum, ItemImpl, Path, Result, Signature, Type, Variant};
 
-use crate::data::RoleName;
-use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
+use crate::data::{RoleName, SignatureExt};
+use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
 pub(crate) struct PayloadEnum {
@@ -35,11 +31,11 @@ impl PayloadEnum {
 	}
 
 	fn create_from_impls(role_name: &RoleName, sigs: &[Signature]) -> Result<Vec<ItemImpl>> {
-		let variant_names = sigs.iter().map(variant_name_from_sig);
+		let variant_names = sigs.iter().map(SignatureExt::enum_variant_name);
 
 		let group_map = sigs
 			.iter()
-			.map(Self::extract_input_type_vector)
+			.map(SignatureExt::extract_input_type_vector)
 			.zip(variant_names.map(|a| (a, 1)))
 			.into_grouping_map();
 
@@ -48,13 +44,13 @@ impl PayloadEnum {
 		let impls: Vec<_> = type_vector_set
 			.into_iter()
 			.filter(|(types, (_, n))| !types.is_empty() && *n == 1)
-			.map(|(types, (ident, _))| Self::type_vector_to_from(&types, &ident, role_name))
+			.map(|(types, (ident, _))| Self::type_vector_to_accepts(&types, &ident, role_name))
 			.try_collect()?;
 
 		Ok(impls)
 	}
 
-	fn type_vector_to_from(
+	fn type_vector_to_accepts(
 		types: &Vec<&Type>,
 		name: &Ident,
 		role_name: &RoleName,
@@ -71,17 +67,11 @@ impl PayloadEnum {
 	}
 
 	fn create_variant(sig: &Signature) -> Result<Variant> {
-		let types = Self::extract_input_type_vector(sig);
+		let types = sig.extract_input_type_vector();
 
-		let variant_name = variant_name_from_sig(sig);
+		let variant_name = sig.enum_variant_name();
 
 		fallible_quote! { #variant_name ((#(#types),*)) }
-	}
-
-	fn extract_input_type_vector(sig: &Signature) -> Vec<&Type> {
-		filter_unwrap!(&sig.inputs, FnArg::Typed)
-			.map(|p| &*p.ty)
-			.collect_vec()
 	}
 }
 
@@ -106,7 +96,7 @@ impl ReturnPayload {
 		methods: &[Signature],
 		role_name: &RoleName,
 	) -> Result<ReturnPayload> {
-		let variants = map_or_bail!(methods, Self::create_variant);
+		let variants = map_or_bail!(methods, SignatureExt::create_return_variant);
 
 		let impls = Self::create_output_from_impls(return_payload_type, methods, role_name)?;
 
@@ -124,11 +114,11 @@ impl ReturnPayload {
 		sigs: &[Signature],
 		role_name: &RoleName,
 	) -> Result<Vec<ItemImpl>> {
-		let variant_names = sigs.iter().map(variant_name_from_sig);
+		let variant_names = sigs.iter().map(SignatureExt::enum_variant_name);
 
 		let group_map = sigs
 			.iter()
-			.map(Self::extract_return_type)
+			.map(SignatureExt::extract_return_type)
 			.zip(variant_names)
 			.into_grouping_map();
 
@@ -168,22 +158,6 @@ impl ReturnPayload {
 			}
 		}
 	}
-
-	fn create_variant(sig: &Signature) -> Result<Variant> {
-		let ret_type = Self::extract_return_type(sig);
-
-		let variant_name = variant_name_from_sig(sig);
-
-		Ok(fallible_quote! { #variant_name (#ret_type) }?)
-	}
-
-	fn extract_return_type(sig: &Signature) -> Type {
-		if let ReturnType::Type(_, ret_type) = &sig.output {
-			(**ret_type).clone()
-		} else {
-			parse_quote!(())
-		}
-	}
 }
 
 impl ToTokens for ReturnPayload {
@@ -193,8 +167,4 @@ impl ToTokens for ReturnPayload {
 			i.to_tokens(tokens);
 		}
 	}
-}
-
-fn variant_name_from_sig(sig: &Signature) -> Ident {
-	format_ident!("{}", sig.ident.to_string().to_case(Case::UpperCamel))
 }
