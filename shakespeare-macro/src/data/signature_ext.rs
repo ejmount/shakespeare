@@ -24,7 +24,7 @@ impl SignatureExt for Signature {
 
 	fn remove_context_param(&mut self) {
 		if self.has_context_input() {
-			let mut items = replace(&mut self.inputs, Punctuated::new())
+			let mut items = std::mem::replace(&mut self.inputs, Punctuated::new())
 				.into_iter()
 				.collect_vec();
 			items.remove(1);
