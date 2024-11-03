@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use tokio::sync::mpsc::*;
+use tokio::sync::mpsc::UnboundedSender;
 
 struct Dropper<T>(T);
 
@@ -12,6 +12,7 @@ impl<T> Drop for Dropper<T> {
 
 #[shakespeare::actor]
 mod Actor {
+
 	struct ActorState {
 		sender: Dropper<UnboundedSender<usize>>,
 	}
@@ -22,11 +23,11 @@ mod Actor {
 		}
 	}
 
-	fn stop(_: ActorState) {
+	fn stop(self) {
 		println!("Exiting");
 	}
 
-	fn catch(_thing: Box<dyn Any + Send>) -> Box<dyn Any + Send> {
+	fn catch(self, _thing: Box<dyn Any + Send>) -> Box<dyn Any + Send> {
 		_thing
 	}
 }
