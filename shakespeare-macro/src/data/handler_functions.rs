@@ -1,17 +1,7 @@
-use itertools::Itertools;
 use quote::{quote, ToTokens};
-use syn::parse::Parser;
-use syn::punctuated::Punctuated;
-use syn::{Error, FnArg, Ident, ItemFn, ReturnType, Token, Type};
+use syn::{Ident, ItemFn, ReturnType};
 
 use super::DataName;
-
-macro_rules! inputs_type_vector {
-	($($tt:tt)*) => {{
-		Punctuated::<Type, Token![,]>::parse_terminated.parse2(quote::quote!{$($tt)*}).unwrap().into_iter().collect_vec()
-
-	}};
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum HandlerFunction {
@@ -36,38 +26,15 @@ impl HandlerFunctions {
 		}
 	}
 
-	pub(crate) fn add(&mut self, fun: ItemFn) -> syn::Result<bool> {
-		let (storage, fields) = match &fun.sig.ident.to_string()[..] {
-			"stop" => (&mut self.exit, inputs_type_vector! {Self}),
-			"catch" => (
-				&mut self.panic,
-				inputs_type_vector! {Self, Box<dyn Any + Send>},
-			),
-			_ => return Ok(false),
+	pub(crate) fn add(&mut self, fun: ItemFn) -> bool {
+		let storage = match &fun.sig.ident.to_string()[..] {
+			"stop" => &mut self.exit,
+			"catch" => &mut self.panic,
+			_ => return false,
 		};
 
-		let types = fun
-			.sig
-			.inputs
-			.iter()
-			.map(|f| match f {
-				FnArg::Receiver(t) => &*t.ty,
-				FnArg::Typed(t) => &*t.ty,
-			})
-			.cloned()
-			.collect_vec();
-
-		if types == fields {
-			*storage = Some(fun);
-			Ok(true)
-		} else {
-			Err(Error::new_spanned(
-				fun,
-				format!(
-					"Found actor hook with incorrect signature, needs: {fields:?}, has {types:?}"
-				),
-			))
-		}
+		*storage = Some(fun);
+		true
 	}
 
 	pub(crate) fn exit_name(&self) -> Option<&Ident> {
