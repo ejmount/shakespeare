@@ -63,13 +63,13 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 ///
 /// **NB**: In case 1, there is no ordering established with other messages sent to the same receiver, even from the same sender. In all other cases, multiple messages to the same receiver from a given sender will be received in sending order. In all cases, ordering between messages sent to different receivers or from different senders is unspecified.
 #[derive(Debug)]
-pub struct Envelope<R, V>
+pub struct Envelope<DestRole, Output>
 where
-	R: Emits<V> + ?Sized + 'static,
+	DestRole: Emits<Output> + ?Sized + 'static,
 {
-	val:  Option<R::Payload>,
-	dest: Option<Arc<R>>,
-	_v:   PhantomData<V>,
+	val:  Option<DestRole::Payload>,
+	dest: Option<Arc<DestRole>>,
+	_v:   PhantomData<Output>,
 }
 
 impl<DestRole, Output> Envelope<DestRole, Output>
@@ -199,6 +199,7 @@ where
 }
 
 #[doc(hidden)]
+/// This is the internal type for actor message queues, representing the input parameters and what to do with the return value
 pub struct ReturnEnvelope<R: Role + ?Sized> {
 	pub payload:     R::Payload,
 	pub return_path: ReturnPath<R::Return>,
