@@ -8,7 +8,6 @@ use syn::spanned::Spanned;
 use syn::{Arm, Attribute, Expr, Ident, ItemImpl, Path, Result};
 
 use crate::data::{DataName, FunctionItem, MethodName, PayloadPath, RoleName, SignatureExt};
-use crate::declarations::make_variant_name;
 use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
@@ -97,7 +96,7 @@ fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) 
 		Either::Right(names.clone())
 	};
 
-	let variant_name = make_variant_name(fun);
+	let variant_name = fun.sig.enum_variant_name();
 
 	let fn_name = make_method_name(role_name, &fun.sig.ident);
 	let asyncness: Option<TokenStream> = fun.sig.asyncness.is_some().then_some(quote!(.await));
