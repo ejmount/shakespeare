@@ -16,10 +16,10 @@ pub mod CounterActor {
 		}
 	}
 
-	fn stop(state: ActorState) -> usize {
-		state.count
+	fn stop(self) -> usize {
+		self.count
 	}
-	fn catch(_: Box<dyn Any + Send>) {}
+	fn catch(self, _: Box<dyn Any + Send>) {}
 }
 
 #[tokio::test]
