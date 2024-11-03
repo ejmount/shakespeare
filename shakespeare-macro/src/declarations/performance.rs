@@ -1,8 +1,6 @@
-use convert_case::{Case, Casing};
 use itertools::Itertools;
-use quote::format_ident;
 use structmeta::{Flag, StructMeta};
-use syn::{Error, Ident, ImplItem, ItemImpl, Path, Result};
+use syn::{Error, ImplItem, ItemImpl, Path, Result};
 
 use crate::data::{FunctionItem, RoleName};
 use crate::macros::filter_unwrap;
