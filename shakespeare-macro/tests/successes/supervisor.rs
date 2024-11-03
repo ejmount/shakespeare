@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::time::Duration;
 
-use shakespeare::{actor, send_future_to, ActorOutcome, ActorSpawn};
+use shakespeare::{actor, send_future_to, ActorOutcome, ActorSpawn, Context};
 use tokio::time::sleep;
 
 type Panic = Box<dyn Any + Send>;
@@ -18,7 +18,7 @@ pub mod Supervisor {
 
 	#[performance(canonical)]
 	impl Starter for SupervisorState {
-		fn go(&mut self) {
+		async fn go(&mut self, ctx: &'_ mut Context<Self>) {
 			let ActorSpawn {
 				msg_handle,
 				join_handle,
@@ -27,7 +27,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			send_future_to::<dyn Listening, _>(join_handle, self.get_shell());
+			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
 			msg_handle.work().await.unwrap();
 
 			let ActorSpawn {
@@ -38,7 +38,7 @@ pub mod Supervisor {
 				success: false,
 				count:   0,
 			});
-			send_future_to::<dyn Listening, _>(join_handle, self.get_shell());
+			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
 			msg_handle.work().await.unwrap();
 
 			let ActorSpawn {
@@ -49,7 +49,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			send_future_to::<dyn Listening, _>(join_handle, self.get_shell());
+			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
 
 			sleep(Duration::from_millis(500)).await;
 			drop(msg_handle);
@@ -68,10 +68,10 @@ pub mod Supervisor {
 		}
 	}
 
-	fn stop(state: SupervisorState) -> bool {
-		state.success && state.failure && state.idle
+	fn stop(self) -> bool {
+		self.success && self.failure && self.idle
 	}
-	fn catch(_val: Panic) {}
+	fn catch(self, _val: Panic) {}
 }
 
 #[actor]
@@ -84,10 +84,10 @@ pub mod Worker {
 
 	#[performance(canonical)]
 	impl Work for WorkerState {
-		async fn work(&mut self) {
+		async fn work(&mut self, ctx: &'_ mut Context<Self>) {
 			self.count += 1;
 			let sleep = sleep(Duration::from_millis(50));
-			send_future_to::<dyn Sleeper, _>(sleep, self.get_shell());
+			send_future_to::<dyn Sleeper, _>(sleep, ctx.get_shell());
 		}
 	}
 	#[performance(canonical)]
@@ -101,11 +101,11 @@ pub mod Worker {
 		}
 	}
 
-	fn stop(ws: WorkerState) -> bool {
-		ws.count > 0
+	fn stop(self) -> bool {
+		self.count > 0
 	}
 
-	fn catch(_val: Panic) {
+	fn catch(self, _val: Panic) {
 		// throw away the panic value
 	}
 }
