@@ -60,9 +60,9 @@ impl SignatureExt for Signature {
 
 	fn payload_pattern(&self) -> impl Iterator<Item = Ident> {
 		let num_parameters = if self.has_context_input() {
-			self.inputs.len()
-		} else {
 			self.inputs.len() - 1
+		} else {
+			self.inputs.len()
 		};
 		(0..num_parameters - 1).map(|n| format_ident!("_{n}"))
 	}
