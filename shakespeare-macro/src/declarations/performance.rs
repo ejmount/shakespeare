@@ -49,8 +49,3 @@ impl PerformanceDecl {
 		&self.role_name
 	}
 }
-
-pub(crate) fn make_variant_name(function: &FunctionItem) -> Ident {
-	let name = function.sig.ident.to_string();
-	format_ident!("{}", name.to_case(Case::UpperCamel))
-}

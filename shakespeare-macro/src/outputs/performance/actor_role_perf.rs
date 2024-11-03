@@ -3,7 +3,6 @@ use quote::ToTokens;
 use syn::{parse_quote, FnArg, ItemImpl, Path, Result, ReturnType, Signature};
 
 use crate::data::{ActorName, FunctionItem, RoleName, SignatureExt};
-use crate::declarations::make_variant_name;
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
 
 #[derive(Debug)]
@@ -65,7 +64,7 @@ fn create_sending_method(
 	} = &sig;
 	let params = filter_unwrap!(inputs, FnArg::Typed).collect_vec();
 	let patterns = params.iter().map(|t| &(*t.pat)).collect_vec();
-	let variant_name = make_variant_name(fun);
+	let variant_name = fun.sig.enum_variant_name();
 
 	let return_type = if let ReturnType::Type(_, ret) = output {
 		*ret.clone()

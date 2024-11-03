@@ -1,14 +1,12 @@
 use convert_case::Case::Snake;
 use convert_case::Casing;
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::parse::Parser;
-use syn::spanned::Spanned;
 use syn::{Arm, Attribute, Expr, Ident, ItemImpl, Path, Result};
 
 use crate::data::{DataName, FunctionItem, MethodName, PayloadPath, RoleName, SignatureExt};
-use crate::declarations::make_variant_name;
 use crate::macros::{fallible_quote, map_or_bail};
 
 #[derive(Debug)]
@@ -79,34 +77,19 @@ fn make_method_name(role_name: &RoleName, old_ident: &Ident) -> Ident {
 }
 
 fn dispatch_case(role_name: &RoleName, payload_type: &Path, fun: &FunctionItem) -> Result<Arm> {
-	let mut num_parameters = fun.sig.inputs.len();
-	if fun.sig.has_context_input() {
-		num_parameters -= 1;
-	}
-	if num_parameters == 0 {
-		return Err(syn::Error::new(
-			fun.span(),
-			"Performance method cannot have no receiver",
-		));
-	}
-	let names = (0..num_parameters - 1).map(|n| format_ident!("_{n}"));
+	let payload_pattern = fun.sig.payload_pattern();
+	let method_call_pattern = fun.sig.method_call_pattern();
 
-	let call_params = if fun.sig.has_context_input() {
-		Either::Left(std::iter::once(format_ident!("context")).chain(names.clone()))
-	} else {
-		Either::Right(names.clone())
-	};
-
-	let variant_name = make_variant_name(fun);
+	let variant_name = fun.sig.enum_variant_name();
 
 	let fn_name = make_method_name(role_name, &fun.sig.ident);
 	let asyncness: Option<TokenStream> = fun.sig.asyncness.is_some().then_some(quote!(.await));
 
 	let into_call: Expr = fallible_quote! {
-			<dyn #role_name as ::shakespeare::Role>::Return::#variant_name( self.#fn_name(#(#call_params),*)#asyncness )
+			<dyn #role_name as ::shakespeare::Role>::Return::#variant_name( self.#fn_name(#(#method_call_pattern),*)#asyncness )
 	}?;
 
 	fallible_quote! {
-		#payload_type::#variant_name ((#(#names),*)) => { #into_call }
+		#payload_type::#variant_name ((#(#payload_pattern),*)) => { #into_call }
 	}
 }
