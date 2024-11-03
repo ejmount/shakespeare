@@ -71,8 +71,8 @@ impl ToTokens for DispatchFunction {
 	}
 }
 
-fn make_method_name(role_name: &RoleName, old_ident: &Ident) -> Ident {
-	let new = format!("{}_{}", role_name.path_leaf(), old_ident).to_case(Snake);
+fn make_method_name(role_name: &RoleName, method_name: &Ident) -> Ident {
+	let new = format!("{}_{}", role_name.path_leaf(), method_name).to_case(Snake);
 	format_ident!("{}", new)
 }
 
