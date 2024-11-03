@@ -103,10 +103,10 @@ impl ActorDecl {
 
 		// Make this less redundant
 		if let Some(handler) = panic_handler {
-			handlers.add(handler)?;
+			handlers.add(handler);
 		}
 		if let Some(handler) = exit_handler {
-			handlers.add(handler)?;
+			handlers.add(handler);
 		}
 
 		assert!(!performances.is_empty(), "Empty perfs");
