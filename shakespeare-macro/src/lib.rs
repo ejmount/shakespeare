@@ -241,14 +241,11 @@ fn role_internal(
 #[cfg(test)]
 mod tests {
 
-	use std::fs::{DirEntry, ReadDir};
 	use std::path::PathBuf;
 	use std::str::FromStr;
 	use std::{env, fs};
 
 	use runtime_macros::emulate_attributelike_macro_expansion;
-
-	use crate::role_internal;
 
 	#[test] // EXPANDER EXCLUDE
 	fn expand_actor() {
