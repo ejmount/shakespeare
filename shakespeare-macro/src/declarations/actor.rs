@@ -1,18 +1,13 @@
 use itertools::Itertools;
-use syn::{parse_quote, Attribute, Error, ImplItem, Item, ItemFn, ItemImpl, ItemMod, Visibility};
+use syn::spanned::Spanned;
+use syn::{
+	Attribute, Error, ImplItem, Item, ItemImpl, ItemMod, Path, Result, TypePath, Visibility,
+};
 
 use crate::data::{ActorName, DataItem, HandlerFunctions};
 use crate::declarations::performance::PerformanceAttribute;
-use crate::macros::{fallible_quote, filter_unwrap};
+use crate::macros::filter_unwrap;
 use crate::{PerformanceDecl, RoleDecl};
-
-enum ActorInternal {
-	Performance(PerformanceDecl),
-	CanonPerformance(PerformanceDecl, RoleDecl),
-	Data(DataItem),
-	PanicHandler(ItemFn),
-	ExitHandler(ItemFn),
-}
 
 pub(crate) struct ActorDecl {
 	pub(crate) actor_name:   ActorName,
@@ -25,66 +20,60 @@ pub(crate) struct ActorDecl {
 	pub(crate) misc:         Vec<Item>,
 }
 
-type Fallible<T> = Result<Option<T>, Error>;
-
-static HANDLERS: &[fn(&Item) -> Fallible<ActorInternal>] = &[
-	read_performance as _,
-	read_data_item as _,
-	read_panic_handler as _,
-	read_exit_handler as _,
-];
-
 impl ActorDecl {
-	pub(crate) fn new(module: ItemMod) -> Result<ActorDecl, Error> {
+	pub(crate) fn new(module: ItemMod) -> Result<ActorDecl> {
+		let module_span = module.span();
+		let ItemMod {
+			attrs,
+			vis: actor_vis,
+			ident,
+			content,
+			..
+		} = module;
+
 		let mut performances = vec![];
 		let mut roles = vec![];
-		let mut data = vec![];
-		let mut panic_handler = None;
-		let mut exit_handler = None;
+		let mut data_items = vec![];
 		let mut misc = vec![];
 
-		let Some((_, items)) = &module.content else {
-			return Err(Error::new_spanned(
-				module,
-				"Actor declaration cannot be empty",
-			));
+		let mut handlers = HandlerFunctions::new();
+
+		let Some((_, items)) = content else {
+			return Err(Error::new(module_span, "Actor declaration cannot be empty"));
 		};
 
 		for item in items {
-			let mut done = false;
-			for handler in HANDLERS {
-				let result = handler(item)?;
-				done |= result.is_some();
-				match result {
-					Some(ActorInternal::CanonPerformance(perf, role)) => {
+			match &item {
+				Item::Impl(imp) => {
+					if let Some((perf, role)) = read_performance(imp)? {
 						performances.push(perf);
-						roles.push(role);
-					}
-					Some(ActorInternal::Performance(perf)) => performances.push(perf),
-					Some(ActorInternal::Data(item)) => data.push(item),
-					Some(ActorInternal::PanicHandler(f)) => {
-						if let Some(panic_fn) = panic_handler.replace(f) {
-							return Err(Error::new_spanned(panic_fn, "Duplicate panic handler"));
+						if let Some(role) = role {
+							roles.push(role);
 						}
+						continue;
 					}
-					Some(ActorInternal::ExitHandler(f)) => {
-						if let Some(exit_fn) = exit_handler.replace(f) {
-							return Err(Error::new_spanned(exit_fn, "Duplicate exit handler"));
-						}
-					}
-					None => continue,
 				}
-			}
-			if !done {
-				misc.push(item.clone());
-			}
+				Item::Fn(item) => {
+					if handlers.add(item) {
+						continue;
+					}
+				}
+				other => {
+					if let Ok(item) = DataItem::try_from(other) {
+						data_items.push(item);
+						continue;
+					}
+				}
+			};
+
+			misc.push(item);
 		}
 
-		let data_item = match data.into_iter().at_most_one() {
+		let data_item = match data_items.into_iter().at_most_one() {
 			Ok(Some(item)) => item,
 			Ok(None) => {
-				return Err(Error::new_spanned(
-					module,
+				return Err(Error::new(
+					module_span,
 					"Actor declaration must contain one struct, enum or union",
 				))
 			}
@@ -96,25 +85,24 @@ impl ActorDecl {
 			}
 		};
 
-		let actor_ident = &module.ident;
-		let actor_name = ActorName::new(fallible_quote! { #actor_ident }?);
+		handlers.set_data_name(data_item.name());
 
-		let mut handlers = HandlerFunctions::new(data_item.name());
+		let actor_path = TypePath {
+			qself: None,
+			path:  Path::from(ident),
+		};
+		let actor_name = ActorName::new(actor_path);
 
-		// Make this less redundant
-		if let Some(handler) = panic_handler {
-			handlers.add(handler);
+		if performances.is_empty() {
+			return Err(Error::new(
+				module_span,
+				"Actor must have at least one performance, even if it's externally defined",
+			));
 		}
-		if let Some(handler) = exit_handler {
-			handlers.add(handler);
-		}
-
-		assert!(!performances.is_empty(), "Empty perfs");
 		// [SpawningFunction] might fall over otherwise
 		// And also doesn't make much sense
 
-		let attributes = module
-			.attrs
+		let attributes = attrs
 			.iter()
 			.filter(is_not_internal_attribute)
 			.cloned()
@@ -122,8 +110,8 @@ impl ActorDecl {
 
 		Ok(ActorDecl {
 			actor_name,
-			actor_vis: module.vis,
 			attributes,
+			actor_vis,
 			data_item,
 			handlers,
 			performances,
@@ -133,7 +121,7 @@ impl ActorDecl {
 	}
 }
 
-fn read_performance(item: &Item) -> Fallible<ActorInternal> {
+fn read_performance(imp: &ItemImpl) -> Result<Option<(PerformanceDecl, Option<RoleDecl>)>> {
 	fn get_performance_tag(imp: &ItemImpl) -> Option<&Attribute> {
 		imp.attrs.iter().find(|attr| {
 			attr.path()
@@ -142,22 +130,19 @@ fn read_performance(item: &Item) -> Fallible<ActorInternal> {
 				.is_some_and(|ps| ps.ident == "performance")
 		})
 	}
-	let syn::Item::Impl(imp) = item else {
-		return Ok(None);
-	};
 
 	let Some(attr) = get_performance_tag(imp) else {
 		return Ok(None);
 	};
 
-	let role_name = &imp.trait_.as_ref().unwrap().1;
+	let (_, role_name, _) = &imp.trait_.as_ref().unwrap();
 	let perf = PerformanceDecl::new(role_name.clone(), imp.clone())?;
 
 	let args: Option<PerformanceAttribute> = attr.parse_args().ok();
 	let canonical = args.map_or(false, |args| args.canonical.value());
 
 	if canonical {
-		let signatures = filter_unwrap!(imp.items.iter(), ImplItem::Fn)
+		let signatures = filter_unwrap!(&imp.items, ImplItem::Fn)
 			.map(|f| &f.sig)
 			.cloned();
 
@@ -171,12 +156,12 @@ fn read_performance(item: &Item) -> Fallible<ActorInternal> {
 		let role = RoleDecl::new(
 			role_name.clone(),
 			attributes,
-			parse_quote! {pub},
+			Visibility::Public(syn::token::Pub::default()),
 			signatures,
 		);
-		Ok(ActorInternal::CanonPerformance(perf, role).into())
+		Ok(Some((perf, Some(role))))
 	} else {
-		Ok(ActorInternal::Performance(perf).into())
+		Ok(Some((perf, None)))
 	}
 }
 
@@ -188,30 +173,6 @@ fn is_not_internal_attribute(a: &&Attribute) -> bool {
 	let ident = &last.ident;
 
 	!(ident == "actor" || ident == "performance" || ident == "role")
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn read_data_item(item: &Item) -> Fallible<ActorInternal> {
-	let Ok(data_item) = DataItem::try_from(item) else {
-		return Ok(None);
-	};
-	Ok(Some(ActorInternal::Data(data_item)))
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn read_panic_handler(item: &Item) -> Fallible<ActorInternal> {
-	match item {
-		Item::Fn(f) if f.sig.ident.eq("catch") => Ok(Some(ActorInternal::PanicHandler(f.clone()))),
-		_ => Ok(None),
-	}
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn read_exit_handler(item: &Item) -> Fallible<ActorInternal> {
-	match item {
-		Item::Fn(f) if f.sig.ident.eq("stop") => Ok(Some(ActorInternal::ExitHandler(f.clone()))),
-		_ => Ok(None),
-	}
 }
 
 fn combine_errors(mut one: Error, another: Error) -> Error {
