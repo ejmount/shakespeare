@@ -4,7 +4,7 @@ use syn::{Ident, ItemFn, ReturnType};
 use super::DataName;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum HandlerFunction {
+enum HandlerFunctionType {
 	Exit,
 	Panic,
 }
@@ -12,28 +12,32 @@ enum HandlerFunction {
 /// Functions that hook various aspects of the actor
 #[derive(Debug)]
 pub(crate) struct HandlerFunctions {
-	state_name: DataName,
+	state_name: Option<DataName>,
 	panic:      Option<ItemFn>,
 	exit:       Option<ItemFn>,
 }
 
 impl HandlerFunctions {
-	pub(crate) fn new(state_name: DataName) -> HandlerFunctions {
+	pub(crate) fn new() -> HandlerFunctions {
 		HandlerFunctions {
-			state_name,
-			exit: None,
-			panic: None,
+			state_name: None,
+			exit:       None,
+			panic:      None,
 		}
 	}
 
-	pub(crate) fn add(&mut self, fun: ItemFn) -> bool {
+	pub(crate) fn set_data_name(&mut self, name: DataName) {
+		self.state_name = Some(name);
+	}
+
+	pub(crate) fn add(&mut self, fun: &ItemFn) -> bool {
 		let storage = match &fun.sig.ident.to_string()[..] {
 			"stop" => &mut self.exit,
 			"catch" => &mut self.panic,
 			_ => return false,
 		};
 
-		*storage = Some(fun);
+		*storage = Some(fun.clone());
 		true
 	}
 
@@ -46,21 +50,24 @@ impl HandlerFunctions {
 	}
 
 	pub(crate) fn panic_return(&self) -> FuncReturnType {
-		FuncReturnType(self.panic.as_ref(), HandlerFunction::Panic)
+		FuncReturnType(self.panic.as_ref(), HandlerFunctionType::Panic)
 	}
 
 	pub(crate) fn exit_return(&self) -> FuncReturnType {
-		FuncReturnType(self.exit.as_ref(), HandlerFunction::Exit)
+		FuncReturnType(self.exit.as_ref(), HandlerFunctionType::Exit)
 	}
 }
 
 impl ToTokens for HandlerFunctions {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		let HandlerFunctions {
-			state_name,
+			state_name: Some(state_name),
 			panic,
 			exit,
-		} = self;
+		} = self
+		else {
+			panic!("Actor is missing internal state type")
+		};
 		quote! {
 			impl #state_name {
 				#panic
@@ -72,7 +79,7 @@ impl ToTokens for HandlerFunctions {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct FuncReturnType<'a>(Option<&'a ItemFn>, HandlerFunction);
+pub(crate) struct FuncReturnType<'a>(Option<&'a ItemFn>, HandlerFunctionType);
 impl ToTokens for FuncReturnType<'_> {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		let return_type = self.0.map(|fun| &fun.sig.output);
@@ -81,8 +88,8 @@ impl ToTokens for FuncReturnType<'_> {
 			Some(ReturnType::Type(_, b)) => b.to_tokens(tokens),
 			Some(ReturnType::Default) => quote! {()}.to_tokens(tokens),
 			None => match self.1 {
-				HandlerFunction::Exit => quote! {()}.to_tokens(tokens),
-				HandlerFunction::Panic => {
+				HandlerFunctionType::Exit => quote! {()}.to_tokens(tokens),
+				HandlerFunctionType::Panic => {
 					quote! {std::boxed::Box<dyn std::any::Any + std::marker::Send>}
 						.to_tokens(tokens);
 				}
