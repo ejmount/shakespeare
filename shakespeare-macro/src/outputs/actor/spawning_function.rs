@@ -77,14 +77,12 @@ impl SpawningFunction {
 		}?;
 
 		let run_panic_handler: syn::Expr = panic_name
-			.map(|p| fallible_quote! { state.#p(panic) })
-			.transpose()?
-			.unwrap_or(fallible_quote! { panic }?);
+			.map(|handler| fallible_quote! { state.#handler(panic) })
+			.unwrap_or(fallible_quote! { panic })?;
 
 		let run_exit_handler: syn::Expr = exit_name
-			.map(|p| fallible_quote! { state.#p()})
-			.transpose()?
-			.unwrap_or(fallible_quote! { () }?);
+			.map(|handler| fallible_quote! { state.#handler()})
+			.unwrap_or(fallible_quote! { () })?;
 
 		let fun: ItemImpl = fallible_quote! {
 			impl #actor_name {
