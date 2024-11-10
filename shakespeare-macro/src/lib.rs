@@ -98,13 +98,13 @@ fn parse_macro_input<T: Parse>(
 /// 2. at least one [`macro@performance`] block.
 ///
 /// The `mod` can also optionally contain any of:
-/// 1. a function called `stop` that consumes a single `S` value and may return a value of any type. This function will be called when the actor drops.
-/// 2. a function called `catch` that consumes a `Box<dyn Any + Send>` and may return a value of any type. This function will be called if any of the actor's performances panic.
+/// 1. a function called `stop` that consumes `self` and may return a value of any type. This function will be called with a self type of `S` when the actor drops or when the `Context` is explicitly called to do so.
+/// 2. a function called `catch` that consumes `self` and also consumes a `Box<dyn Any + Send>` and may return a value of any type. This function will be called (also on `S`) if any of the actor's performances panic.
 ///
-/// Inherent `impl S` blocks are allowed, but should be placed outside the actor `mod`. The state should not define a method called, `get_shell`, see [`macro@performance`].
+/// Inherent `impl S` blocks are allowed, but should be placed outside the actor `mod`.
 ///
 /// The macro then generates a new type with the same name as the module. This new type:
-/// 1. has a constructor function `start(state: S) -> ActorSpawn<Self>`
+/// 1. has a constructor function `start(state: S) -> ActorSpawn<Self>`. (This function is currently *always* private to the parent module containg the `#[actor]`)
 /// 2. implements each role trait for which it has a performance.
 ///
 /// The `ActorSpawn` contains an `Arc` that refers to the actor object. This value is the interface for sending the actor messages and controls its lifetime. When the last `Arc` goes out of scope, the actor will finish processing any messages it has already received, call its `stop` function if one exists, and then drop its state. If a method handler inside a performance panics, the `catch` function will be called *instead of* `stop`.
@@ -134,16 +134,25 @@ fn actor_internal(
 
 /// Defines an actor's implementation of a Role.
 ///
-/// This macro applies to an `impl...for` block that names the role being implemented and the *state* type, `impl Role for State`. The result will be that the trait's methods can be called on the *actor* type to pass messages into the actor and, if applicable, await any return value.
+/// This macro applies to an `impl...for` block that names the role being implemented and the *state* type, `impl Role for State`. The result will be that the trait's methods can be called on the *actor* type to pass messages into the corresponding actor and, if applicable, await any return value.
 ///
 /// ```ignore
 /// // A Role method
 /// fn a_method(&mut self, value: T /* ... */) -> ReturnType;
 /// // becomes an actor method:
-/// async fn a_method(&self, value: T /* ... */) -> ReturnType;
+/// async fn a_method(&self, value: T /* ... */) -> Envelope<Role, ReturnType>;
 /// ```
 ///
-/// The trait's methods will be called with the actor's *state type* as the `self` type. The body of the methods are allowed to be arbitrary code like any other trait implementation, within the type signature restrictions required by [`macro@role`]. Additionally, the macro generates a new method for the state type, `Self::get_shell`, which will return an `Arc` of the running actor's message handle, which can then be, e.g. sent as a value to other actors. Be aware that an actor storing its own handle will effectively leak, as an actor normally exits only when all copies of its handle are dropped.
+/// The trait's methods will be called with the actor's *state type* as the `self` type. The body of the methods are allowed to be arbitrary code like any other trait implementation, within the type signature restrictions required by [`macro@role`].
+///
+/// Some methods may want to change the behaviour of the actor, such as by explicitly shutting it down or getting a copy of the actor handle. To do this, the method uses a `Context` object, which is gained by defining the second parameter (directly after the receiver) of the method as a (mutable if required) reference to a `Context`. This should *not* appear in the corresponding `Role` definition, and so will not appear in actor's external methods.  Besides the method receiver, this is currently the *only* way a method inside a performance can receive a non-static value.
+/// ```ignore
+/// // The previous implementation can also be written,
+/// fn a_method(&mut self, ctx: &'_ mut Context, value: T /* ... */) -> ReturnType; // or...
+/// fn a_method(&mut self, ctx: &'_ Context, value: T /* ... */) -> ReturnType;
+/// // which still becomes the same method on the actor for clients to interact with:
+/// async fn a_method(&self, value: T /* ... */) -> Envelope<Role, ReturnType>;
+/// ```
 ///
 /// The implementation of a performance does not have to be contained within the module that defines the associated actor, but if it is *not*, the actor module must contain an empty impl block naming the appropriate role. That is, the following is allowed:
 /// ```
@@ -153,7 +162,7 @@ fn actor_internal(
 /// mod MyActor {
 /// 	struct S;
 /// 	#[performance]
-/// 	impl MyRole for S {}
+/// 	impl MyRole for S {} // <-- The braces are obligatory even when empty
 /// }
 ///
 /// #[performance]
@@ -170,7 +179,7 @@ fn actor_internal(
 /// ```
 /// The names of the state and role types are resolved by normal language rules, so performance blocks do not need to be in the same module as the actor or role they name.
 ///
-/// It is expected that many roles will have one "primary" implementation that defines the interface that, e.g. mock objects, are expected to follow. To reduce boilerplate, the macro takes a `canonical` flag, which will implicitly define a Role by the performance. (For now, a canonical performance *must* be inside the actor module - this restriction may be removed in the future) This means the previous example can be simplified to:
+/// It is expected that many roles will have one "primary" implementation that defines the interface that, e.g. mock objects, are expected to follow. To reduce boilerplate, the macro takes a `canonical` flag, which will implicitly define a Role by the performance. For now, a canonical performance *must* be inside the actor module - this restriction may be removed in the future) (Methods of a canonical performance can take a `Context` as described previously and this won't appear in the implied Role.) This means the previous example can be simplified to:
 ///
 /// ```
 /// # use shakespeare::{actor, performance};
@@ -218,7 +227,21 @@ fn performance_internal(
 /// Role methods may be async, and if they are, may `await` other futures. However, be aware that the actor's message loop will be blocked while awaiting - this risks deadlocks if other actors have sent it messages and are waiting for the return values. [`send_return_to`][`send_return_to`] may be useful to avoid this situation.
 ///
 /// Except for the above restrictions, a role is otherwise a normal trait and its methods can have any number of methods, input parameters, and return values of any type.
-/// (Be aware that extremely large types being passed by value may cause performance impacts - these can be avoided by passing `Box` etc instead)
+/// (Be aware that extremely large types may cause performance impacts - these can be avoided by passing `Box` etc instead)
+///
+/// However, the generated trait's methods will *not* have exactly the signatures written in the trait block. Instead, given a Role defined by:
+/// ```ignore
+/// #[role]
+/// trait MyRole {
+/// 	fn a_method(&mut self, input: u32) -> ReturnType;
+/// }
+/// ```
+/// An actor implementing this role via a [`macro@performance`] block will have a method with the following signature:
+/// ```ignore
+/// fn a_method(&self, input: u32) -> Envelope<dyn MyRole, ReturnType>;
+/// ```
+///
+/// Calling this method won't immediately do any work - see the documentation for [`Envelope`]
 #[proc_macro_attribute]
 pub fn role(attr: TokenStream, item: TokenStream) -> TokenStream {
 	role_internal(attr.into(), item.into()).into()
