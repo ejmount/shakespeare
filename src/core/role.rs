@@ -80,7 +80,7 @@ impl<R: Role + ?Sized> Accepts<R::Payload> for R {
 
 /// At least one method of this Role produces a `T`
 ///
-/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. This is primarily required to make [`crate::Envelope`] ergonomic but also underpins [`crate::send_return_to`].
+/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. This is primarily required to allow [`crate::Envelope`] to return the proper return type, but also underpins [`crate::send_return_to`].
 pub trait Emits<T>: Role {
 	#[doc(hidden)]
 	fn from_return_payload(t: Self::Return) -> T;
