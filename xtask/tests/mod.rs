@@ -1,3 +1,4 @@
+#![allow(warnings)]
 #[cfg(test)]
 mod expanded {
 

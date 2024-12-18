@@ -40,7 +40,7 @@ fn main() -> Result<(), walkdir::Error> {
 				let line = line.replace("crate::", "crate::stripped_macro::");
 				let line = line.replace("proc_macro::", "proc_macro2::");
 
-				writeln!(new_file, "{}", line).unwrap();
+				writeln!(new_file, "{line}").unwrap();
 			}
 		} else if entry.metadata()?.is_dir() && !new_path.exists() {
 			create_dir_all(&new_path).unwrap_or_else(|_| panic!("{new_path:?} invalid to create"));
