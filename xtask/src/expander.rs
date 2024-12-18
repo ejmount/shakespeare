@@ -1,36 +1,39 @@
 use anyhow::Error;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::visit::Visit;
+use syn::visit_mut::VisitMut;
 use syn::{parse_file, AttrStyle, Attribute, Item, ItemMod, Meta, MetaList};
 
 use crate::stripped_macro::{make_actor, make_performance, make_role};
 
-fn find_attribute<'a>(attrs: &'a Vec<Attribute>, needle: &str) -> Option<&'a Attribute> {
-	for a in attrs {
-		if a.style == AttrStyle::Outer {
-			match &a.meta {
+fn find_attribute(attrs: &mut Vec<Attribute>, needle: &str) -> Option<Attribute> {
+	let mut index = None;
+
+	for (ind, attr) in attrs.iter().enumerate() {
+		if attr.style == AttrStyle::Outer {
+			match &attr.meta {
 				Meta::Path(path) | Meta::List(MetaList { path, .. }) => {
 					let Some(leaf) = path.segments.last() else {
 						continue;
 					};
 					if leaf.ident.eq(needle) {
-						return Some(a);
+						index = Some(ind);
 					}
 				}
 				Meta::NameValue(_) => continue,
 			}
 		}
 	}
-	None
+
+	index.map(|index| attrs.swap_remove(index))
 }
 
 #[derive(Default)]
 struct Walker(TokenStream);
 
-impl<'ast> Visit<'ast> for Walker {
-	fn visit_item_mod(&mut self, i: &'ast syn::ItemMod) {
-		let attrs = &i.attrs;
+impl VisitMut for Walker {
+	fn visit_item_mod_mut(&mut self, i: &mut syn::ItemMod) {
+		let attrs = &mut i.attrs;
 		let present = find_attribute(attrs, "actor");
 		if present.is_some() {
 			let tokens = match make_actor(i.clone()) {
@@ -48,17 +51,17 @@ impl<'ast> Visit<'ast> for Walker {
 				unsafety,
 				vis,
 				..
-			} = &i;
+			} = i;
 
-			if let Some((_, items)) = content.as_ref() {
+			if let Some((_, items)) = content.as_mut() {
 				for item in items {
-					subwalker.visit_item(item);
+					subwalker.visit_item_mut(item);
 				}
 				let Walker(tok) = subwalker;
 
 				self.0.extend(quote! {
 					#(#attrs)*
-					#vis #unsafety mod #ident {
+					 #vis #unsafety mod #ident {
 						#tok
 					}
 				});
@@ -68,8 +71,8 @@ impl<'ast> Visit<'ast> for Walker {
 		}
 	}
 
-	fn visit_item_trait(&mut self, i: &'ast syn::ItemTrait) {
-		let attrs = &i.attrs;
+	fn visit_item_trait_mut(&mut self, i: &mut syn::ItemTrait) {
+		let attrs = &mut i.attrs;
 		let present = find_attribute(attrs, "role");
 		if present.is_some() {
 			let tokens = match make_role(i.clone()) {
@@ -82,8 +85,8 @@ impl<'ast> Visit<'ast> for Walker {
 		}
 	}
 
-	fn visit_item_impl(&mut self, i: &'ast syn::ItemImpl) {
-		let attrs = &i.attrs;
+	fn visit_item_impl_mut(&mut self, i: &mut syn::ItemImpl) {
+		let attrs = &mut i.attrs;
 		let present = find_attribute(attrs, "performance");
 		if present.is_some() {
 			let tokens = match make_performance(i.clone()) {
@@ -96,22 +99,22 @@ impl<'ast> Visit<'ast> for Walker {
 		}
 	}
 
-	fn visit_item(&mut self, i: &'ast Item) {
+	fn visit_item_mut(&mut self, i: &mut Item) {
 		//dbg!(&i);
 		match i {
-			syn::Item::Impl(i) => self.visit_item_impl(i),
-			syn::Item::Mod(i) => self.visit_item_mod(i),
-			syn::Item::Trait(i) => self.visit_item_trait(i),
+			syn::Item::Impl(i) => self.visit_item_impl_mut(i),
+			syn::Item::Mod(i) => self.visit_item_mod_mut(i),
+			syn::Item::Trait(i) => self.visit_item_trait_mut(i),
 			els => self.0.extend(els.into_token_stream()),
 		}
 	}
 }
 
 fn expand_test(contents: &str) -> Result<TokenStream, Error> {
-	let file = parse_file(contents)?;
+	let mut file = parse_file(contents)?;
 
 	let mut walker = Walker::default();
-	walker.visit_file(&file);
+	walker.visit_file_mut(&mut file);
 	let Walker(tok) = walker;
 	Ok(tok)
 }
