@@ -28,8 +28,7 @@ fn main() -> Result<(), walkdir::Error> {
 			let mut new_file = std::fs::File::create(new_path).unwrap();
 
 			for line in contents.lines() {
-				if line.starts_with("#![allow(")
-					|| line.starts_with("#![warn(")
+				if line.starts_with("#![warn(")
 					|| line.starts_with("#![deny(")
 					|| line.starts_with("#![forbid(")
 					|| line.contains("#[test] // EXPANDER EXCLUDE")

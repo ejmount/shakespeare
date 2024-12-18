@@ -9,7 +9,7 @@ pub mod actor {
 	pub mod FooActor {
 		pub struct FooState {}
 		#[shakespeare::performance]
-		impl crate::successes::modules::role::RoleTrait for FooState {}
+		impl super::role::RoleTrait for FooState {}
 	}
 
 	pub(crate) fn new(state: FooState) -> ActorSpawn<FooActor> {
@@ -27,9 +27,9 @@ pub mod role {
 
 pub mod perf {
 	#[shakespeare::performance]
-	impl crate::successes::modules::role::RoleTrait for crate::successes::modules::actor::FooState {
+	impl super::role::RoleTrait for super::actor::FooState {
 		async fn handler(&mut self) {
-			use crate::successes::modules::do_a_thing;
+			use super::do_a_thing;
 			do_a_thing();
 		}
 	}
@@ -37,12 +37,11 @@ pub mod perf {
 
 #[tokio::test]
 pub async fn main() {
+	use actor::FooState;
+	use role::RoleTrait;
 	use shakespeare::ActorSpawn;
 
-	use crate::successes::modules::actor::FooState;
-	use crate::successes::modules::role::RoleTrait;
-
-	let ActorSpawn { msg_handle, .. } = crate::successes::modules::actor::new(FooState {});
+	let ActorSpawn { msg_handle, .. } = self::actor::new(FooState {});
 	let ptr: Arc<dyn RoleTrait> = msg_handle;
 	ptr.handler().await.unwrap();
 }
