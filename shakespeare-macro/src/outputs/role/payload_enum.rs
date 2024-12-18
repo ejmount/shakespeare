@@ -56,6 +56,7 @@ impl PayloadEnum {
 		role_name: &RoleName,
 	) -> Result<ItemImpl> {
 		fallible_quote! {
+			#[allow(unused_parens)]
 			impl ::shakespeare::Accepts<(#(#types),*)> for dyn #role_name {
 				#[allow(unused_parens)]
 				#[doc(hidden)]
