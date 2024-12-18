@@ -47,19 +47,19 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 			Immediate(channel) => {
 				let _ = channel.send(val);
 			}
-		};
+		}
 	}
 }
 
 /// A message that has been prepared to be (*but not yet*) sent to an actor, produced by calling a Role method on the actor shell.
 ///
-/// This type allows the caller to control how the return value, of type `V`, produced by the actor processing the message will be handled. As a result, while this value exists the message has not been sent.
+/// This type allows the caller to control how the return value, of type `Output`, produced by the actor processing the message will be handled. As a result, while this value exists the message has not been sent.
 ///
 /// The caller is expected to do one of four things with this value:
 /// 1. nothing - that is, allowing it to drop will dispatch the message and have any return value thrown away, but *will not* wait for the message delivery to complete.
 /// 2. awaiting this value will wait for the actor to recive and process the message, then yield the return value to the caller
-/// 3. calling [`ignore()`][`Envelope::ignore`] and awaiting the resulting future *will wait* for the message to be sent, but will throw away any return value.
-/// 4. calling [`send_return_to`][`crate::send_return_to`] will send the return value directly to another actor's mailbox.
+/// 3. calling [`ignore()`][`Envelope::ignore`] and awaiting the resulting future *will wait* for the message to be sent, but will not wait for any return value.
+/// 4. calling [`send_return_to`][`crate::send_reply_to`] will send the return value directly to a given actor's mailbox.
 ///
 /// **NB**: In case 1, there is no ordering established with other messages sent to the same receiver, even from the same sender. In all other cases, multiple messages to the same receiver from a given sender will be received in sending order. In all cases, ordering between messages sent to different receivers or from different senders is unspecified.
 #[derive(Debug)]
@@ -98,7 +98,7 @@ where
 	///
 	/// # Errors
 	///
-	/// This function may return `Err` if the actor has already stopped, i.e. has panicked.
+	/// This function may return `Err` if the actor has already stopped.
 	#[must_use = "The message will not be sent to the actor if this Future isn't processed"]
 	#[expect(clippy::missing_panics_doc)] // This is complaining about the `take`, but that should only be None if this has dropped
 	pub async fn ignore(mut self) -> Result<(), Role2SendError<DestRole>> {
@@ -115,21 +115,21 @@ where
 	}
 }
 
-impl<R, V> IntoFuture for Envelope<R, V>
+impl<DestRole, Output> IntoFuture for Envelope<DestRole, Output>
 where
-	R: Emits<V> + ?Sized + 'static,
+	DestRole: Emits<Output> + ?Sized + 'static,
 {
 	#[doc(hidden)]
-	type IntoFuture = ReturnCaster<R, V>;
+	type IntoFuture = ReturnCaster<DestRole, Output>;
 	/// The return received from the envelope can fail if the message handler doesn't complete
-	type Output = std::result::Result<V, RecvError>;
+	type Output = std::result::Result<Output, RecvError>;
 
 	fn into_future(self) -> Self::IntoFuture {
 		let (payload, dest) = self.unpack();
 
 		let (return_path, rx) = ReturnPath::create_immediate();
 
-		let envelope: ReturnEnvelope<R> = ReturnEnvelope {
+		let envelope = ReturnEnvelope {
 			payload,
 			return_path,
 		};
@@ -145,7 +145,10 @@ where
 	}
 }
 
-impl<R: Emits<V> + ?Sized, V> Drop for Envelope<R, V> {
+impl<DestRole, Output> Drop for Envelope<DestRole, Output>
+where
+	DestRole: Emits<Output> + ?Sized,
+{
 	fn drop(&mut self) {
 		let val = self.val.take().unwrap();
 		let dest = self.dest.take().unwrap();

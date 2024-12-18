@@ -9,9 +9,9 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::missing_panics_doc)]
 #![warn(clippy::dbg_macro)]
-#![forbid(unsafe_code)]
 #![warn(clippy::todo)]
 #![warn(clippy::unimplemented)]
+#![forbid(unsafe_code)]
 
 use std::any::Any;
 use std::future::Future;
@@ -47,7 +47,7 @@ pub type Role2Payload<R> = <R as Role>::Payload;
 pub type Role2Receiver<R> = <<R as Role>::Channel as Channel>::Receiver;
 /// Shortcut to resolve a Role's channel's sender type.
 pub type Role2Sender<R> = <<R as Role>::Channel as Channel>::Sender;
-/// Shortcut to resolve the sender's error type
+/// Shortcut to resolve the sender's error type. For now, this is always [`SendError`][`crate::tokio_export::sync::mpsc::error::SendError`]
 pub type Role2SendError<R> = <Role2Sender<R> as RoleSender<ReturnEnvelope<R>>>::Error;
 
 #[doc(hidden)]
@@ -65,9 +65,7 @@ where
 ///
 /// The type constraints ensure that it is unambigious which method handler this will dispatch to.
 ///
-/// This function does not do anything to inform the actor when the stream closes, successfuly or otherwise. If sending the message to the actor fails, the stream will be dropped.
-///
-/// **N.B**: this function retains the `Arc<dyn Role>` for as long as the stream is still active, and will keep the actor alive for that time.
+/// This function does not do anything to inform the actor when the stream closes, successfuly or otherwise. If sending the stream item to the actor fails, the stream will be dropped. If an actor explicitly shuts down with an active stream, the stream will be dropped with any remaining items unread. A sent stream prevents an actor shutting down from zero remaining handles until the stream runs out, and conversely, the stream running out will release the held handle.
 pub fn send_stream_to<R, S>(stream: S, actor: Arc<R>)
 where
 	R: Accepts<S::Item> + ?Sized + 'static,
@@ -115,10 +113,14 @@ where
 
 /// Arranges for the *return value* produced by processing the given [`Envelope`] to be forwarded to the recipient actor. Any return value produced by the receipient is ignored.
 ///
+/// An actor may want to call this method using its own handle as the destination, so that it receives the `Envelope`'s return value without `await`ing inside the message handler that's making the call, which would pause the event loop as a whole. However, tying this return value back to the message that led to the `send_reply_to` call currently has no specific support and is left to the developer.
+///
 /// Equivalent to, but more efficient than, passing the same parameters to [`send_future_to`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
 ///
-/// Can return an Err if the actor originating the Envelope panics before the message is delivered
-pub async fn send_return_to<RxRole, SendingRole, BridgeType>(
+/// # Errors
+///
+/// Can return an Err if the actor originating the Envelope stops before the Envelope is delivered to the recipient
+pub async fn send_reply_to<RxRole, SendingRole, BridgeType>(
 	env: Envelope<SendingRole, BridgeType>,
 	recipient: Arc<RxRole>,
 ) -> Result<(), Role2SendError<SendingRole>>

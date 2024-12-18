@@ -1,7 +1,6 @@
 use convert_case::{Case, Casing};
 use itertools::{Either, Itertools};
 use quote::format_ident;
-use syn::punctuated::Punctuated;
 use syn::{parse_quote, FnArg, Ident, PatType, Signature, Type, Variant};
 
 use crate::macros::{fallible_quote, filter_unwrap};
@@ -21,7 +20,7 @@ impl SignatureExt for Signature {
 	fn has_context_input(&self) -> bool {
 		if let Some(FnArg::Typed(PatType { ty, .. })) = self.inputs.iter().nth(1) {
 			if let Type::Reference(r) = &**ty {
-				r.lifetime.as_ref().map_or(false, |l| l.ident != "static")
+				r.lifetime.as_ref().is_some_and(|l| l.ident != "static")
 			} else {
 				false
 			}
@@ -32,9 +31,7 @@ impl SignatureExt for Signature {
 
 	fn remove_context_param(&mut self) {
 		if self.has_context_input() {
-			let mut items = std::mem::replace(&mut self.inputs, Punctuated::new())
-				.into_iter()
-				.collect_vec();
+			let mut items = std::mem::take(&mut self.inputs).into_iter().collect_vec();
 			items.remove(1);
 			self.inputs = items.into_iter().collect();
 		}
