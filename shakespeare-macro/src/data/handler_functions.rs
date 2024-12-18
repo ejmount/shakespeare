@@ -49,11 +49,11 @@ impl HandlerFunctions {
 		self.panic.as_ref().map(|i| &i.sig.ident)
 	}
 
-	pub(crate) fn panic_return(&self) -> FuncReturnType {
+	pub(crate) fn panic_return(&self) -> FuncReturnType<'_> {
 		FuncReturnType(self.panic.as_ref(), HandlerFunctionType::Panic)
 	}
 
-	pub(crate) fn exit_return(&self) -> FuncReturnType {
+	pub(crate) fn exit_return(&self) -> FuncReturnType<'_> {
 		FuncReturnType(self.exit.as_ref(), HandlerFunctionType::Exit)
 	}
 }
@@ -94,6 +94,6 @@ impl ToTokens for FuncReturnType<'_> {
 						.to_tokens(tokens);
 				}
 			},
-		};
+		}
 	}
 }

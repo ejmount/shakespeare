@@ -9,10 +9,10 @@ use tokio::task::JoinHandle;
 /// Indicates whether an actor closed down successfully and any output value produced
 pub enum Outcome<A: Shell> {
 	#[doc(hidden)]
-	/// The actor was explicitly aborted.
+	/// The actor was explicitly aborted at the task level.
 	/// It shouldn't be possible to encounter this is in practice,
 	Aborted(tokio::task::JoinError),
-	/// The actor exited successfully when all of its strong references dropped
+	/// The actor exited successfully either as all of its strong references dropped or by explicit shutdown.
 	Exit(A::ExitType),
 	/// The actor panicked executing one of its message handlers.
 	Panic(A::PanicType),

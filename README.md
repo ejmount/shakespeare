@@ -18,7 +18,7 @@ Its most significant features include:
 * __Interoperability__ - linking actors into the wider ecosystem of async code is designed to be easy - actor messages implement `Future`, and actors can interact with  `Future` and `Stream` generically.
 * __Recovery__ - an actor shutting down both runs a cleanup function within the actor and sends out a value indicating whether the shutdown was graceful (i.e. all references were dropped) or was a result of a panic within a message handler, along with any return value from the cleanup. Another actor can then subscribe to receive this value like any other `Future`.
 
-Shakespeare currently runs exclusively on tokio but this may change in the future. It also currently uses only unbounded channels and so has no handling of backpressure, but improving this is planned future work.
+Shakespeare currently runs exclusively on [tokio](https://tokio.rs/) but this may change in the future. It also currently uses only unbounded channels and so has no handling of backpressure, but improving this is planned future work.
 
 ## Example
 

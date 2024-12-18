@@ -5,6 +5,10 @@ use super::State;
 #[derive(Debug)]
 /// Various options for controlling the behaviour of the currently running actor.
 ///
+/// This is what you need if you want to:
+/// * get a copy of the currently running actor's handle
+/// * stop the currently running actor without waiting for all handles to drop
+///
 /// To access this, the performance signature should take a `&mut Context<Self>` as its second parameter after the receiver.
 pub struct Context<A: State + ?Sized> {
 	shell_handle: Arc<A::ShellType>,

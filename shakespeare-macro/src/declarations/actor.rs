@@ -64,7 +64,7 @@ impl ActorDecl {
 						continue;
 					}
 				}
-			};
+			}
 
 			misc.push(item);
 		}
@@ -139,7 +139,7 @@ fn read_performance(imp: &ItemImpl) -> Result<Option<(PerformanceDecl, Option<Ro
 	let perf = PerformanceDecl::new(role_name.clone(), imp.clone())?;
 
 	let args: Option<PerformanceAttribute> = attr.parse_args().ok();
-	let canonical = args.map_or(false, |args| args.canonical.value());
+	let canonical = args.is_some_and(|args| args.canonical.value());
 
 	if canonical {
 		let signatures = filter_unwrap!(&imp.items, ImplItem::Fn)

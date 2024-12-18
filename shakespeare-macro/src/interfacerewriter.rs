@@ -9,7 +9,7 @@ pub(crate) struct InterfaceRewriter<'a> {
 	role_name: &'a RoleName,
 }
 impl InterfaceRewriter<'_> {
-	pub(crate) fn new(role_name: &RoleName) -> InterfaceRewriter {
+	pub(crate) fn new(role_name: &RoleName) -> InterfaceRewriter<'_> {
 		InterfaceRewriter { role_name }
 	}
 }

@@ -36,8 +36,8 @@ pub trait Channel {
 
 /// A Role that an Actor can implement.
 ///
-/// Roles implement this trait, which describes the generic features all roles contain. See the [`role!`][`::shakespeare_macro::role`] macro for more information.
-/// No internal details of this trait are relevant to external users, only whether it is implemented and its related implementations of ['Accepts'] and ['Emits']
+/// Roles implement this trait, which describes the generic features all roles contain. See the [`super::super::role`] macro for more information.
+/// No internal details of this trait are relevant to external users, only whether it is implemented and its related implementations of [`Accepts`] and [`Emits`]
 #[trait_variant::make(Send)]
 // This logically *should* be 'static but the compiler can't deal with the lifetime bounds properly. See https://github.com/rust-lang/rust/issues/131488
 // The compiler seems to be OK if 'static is listed seperately in the signature of the functions that need it.
@@ -49,7 +49,8 @@ pub trait Role: Sync + Send {
 	#[doc(hidden)]
 	type Channel: Channel<Item = ReturnEnvelope<Self>>;
 	#[doc(hidden)]
-	/// Can potentially error if the actor crashes before the message is received
+	/// Puts a message into the corresponding queue for the actor
+	/// Can potentially error if the actor stops before the message is received
 	async fn enqueue(&self, val: ReturnEnvelope<Self>) -> Result<(), Role2SendError<Self>>;
 }
 
@@ -71,7 +72,7 @@ impl<R: Role + ?Sized> Accepts<R::Payload> for R {
 
 /// At least one method of this Role produces a `T`
 ///
-/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. This is primarily required to allow [`crate::Envelope`] to return the proper return type, but also underpins [`crate::send_return_to`].
+/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. This is primarily required to allow [`crate::Envelope`] to return the proper return type, but also underpins [`crate::send_reply_to`].
 pub trait Emits<T>: Role {
 	#[doc(hidden)]
 	fn from_return_payload(t: Self::Return) -> T;

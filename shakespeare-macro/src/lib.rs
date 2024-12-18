@@ -1,4 +1,4 @@
-//! This crate contains the macros powering [`shakespeare`]. More information can be found in that crate.
+//! This crate co8tains the macros powering [`shakespeare`](https://docs.rs/shakespeare/latest/shakespeare/). More information can be found in that crate.
 #![forbid(unsafe_code)]
 #![forbid(future_incompatible)]
 #![warn(missing_copy_implementations)]
@@ -30,6 +30,10 @@ use quote::ToTokens;
 use syn::parse::Parse;
 use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem, Type};
 use visibility as _;
+
+// The following three functions exist as entry points to the macros that can be called outside of a proc-macro context.
+// This is so that the xtask expand script can call them to manually do code expansion.
+// They must be public so that the other module can see them, but cannot be public if this being built as a proc-macro crate because they have the wrong signatures.
 
 #[cfg_attr(not(proc_macro), visibility::make(pub(crate)))]
 fn make_actor(module: ItemMod) -> Result<ActorOutput> {
@@ -99,12 +103,12 @@ fn parse_macro_input<T: Parse>(
 ///
 /// The `mod` can also optionally contain any of:
 /// 1. a function called `stop` that consumes `self` and may return a value of any type. This function will be called with a self type of `S` when the actor drops or when the `Context` is explicitly called to do so.
-/// 2. a function called `catch` that consumes `self` and also consumes a `Box<dyn Any + Send>` and may return a value of any type. This function will be called (also on `S`) if any of the actor's performances panic.
+/// 2. a function called `catch` that consumes `self` and also consumes a `Box<dyn Any + Send>` and may return a value of any type. This function will be called (also on `S`) if any of the actor's performance methods panic.
 ///
-/// Inherent `impl S` blocks are allowed, but should be placed outside the actor `mod`.
+/// Other items, including inherent `impl S` blocks, will be passed through unmodified into the surrounding module.
 ///
 /// The macro then generates a new type with the same name as the module. This new type:
-/// 1. has a constructor function `start(state: S) -> ActorSpawn<Self>`. (This function is currently *always* private to the parent module containg the `#[actor]`)
+/// 1. has a constructor function `start(state: S) -> ActorSpawn<Self>`. (This function is currently *always* private to the parent module containg the `#[actor]` block - write a wrapper for now if you want to access it from outside)
 /// 2. implements each role trait for which it has a performance.
 ///
 /// The `ActorSpawn` contains an `Arc` that refers to the actor object. This value is the interface for sending the actor messages and controls its lifetime. When the last `Arc` goes out of scope, the actor will finish processing any messages it has already received, call its `stop` function if one exists, and then drop its state. If a method handler inside a performance panics, the `catch` function will be called *instead of* `stop`.
@@ -179,7 +183,7 @@ fn actor_internal(
 /// ```
 /// The names of the state and role types are resolved by normal language rules, so performance blocks do not need to be in the same module as the actor or role they name.
 ///
-/// It is expected that many roles will have one "primary" implementation that defines the interface that, e.g. mock objects, are expected to follow. To reduce boilerplate, the macro takes a `canonical` flag, which will implicitly define a Role by the performance. For now, a canonical performance *must* be inside the actor module - this restriction may be removed in the future) (Methods of a canonical performance can take a `Context` as described previously and this won't appear in the implied Role.) This means the previous example can be simplified to:
+/// It is expected that many roles will have one "primary" implementation that defines the interface that, e.g. mock objects, are expected to follow. To reduce boilerplate, the macro takes a `canonical` flag, which will implicitly define a Role by the performance. For now, a canonical performance *must* be inside the actor module - this restriction may be removed in the future. (Methods of a canonical performance can take a `Context` as described previously and this won't appear in the implied Role.) This means the previous example can be simplified to:
 ///
 /// ```
 /// # use shakespeare::{actor, performance};
@@ -216,20 +220,20 @@ fn performance_internal(
 
 /// Defines an interface that an actor may implement.
 ///
-/// This macro applies to a `trait` block, and for now takes no parameters.
+/// This macro applies to a `trait` block, and for now has no attributes.
 ///
 /// The trait has the following restrictions:
 /// 1. it cannot have any associated constants or types
 /// 2. all functions must be methods and must take either `&self` or `&mut self` as receiver.
 /// 3. all other parameters and all return types must have a lifetime of `'static`
-/// 4. Neither methods nor parameters can have "free" generic parameters, nor `impl Trait` return values. (`Option<u32>` is allowed, `Option<T>` is not)
+/// 4. Neither methods nor parameters can have "unbound" generic parameters, nor use `impl Trait` in either parameter or return position. (`Option<u32>` is allowed, `Option<T>` is not)
 ///
-/// Role methods may be async, and if they are, may `await` other futures. However, be aware that the actor's message loop will be blocked while awaiting - this risks deadlocks if other actors have sent it messages and are waiting for the return values. [`send_return_to`][`send_return_to`] may be useful to avoid this situation.
+/// Role methods may be async, and if they are, may `await` other futures. However, be aware that the actor's message loop will be blocked while awaiting - this risks deadlocks if other actors have sent it messages and are waiting for the return values. [`send_reply_to`](https://docs.rs/shakespeare/latest/shakespeare/fn.send_reply_to.html) may be useful to avoid this situation.
 ///
 /// Except for the above restrictions, a role is otherwise a normal trait and its methods can have any number of methods, input parameters, and return values of any type.
-/// (Be aware that extremely large types may cause performance impacts - these can be avoided by passing `Box` etc instead)
+/// (Be aware that, as with any other trait, extremely large inline types may cause performance impacts - these can be avoided by passing `Box` etc instead)
 ///
-/// However, the generated trait's methods will *not* have exactly the signatures written in the trait block. Instead, given a Role defined by:
+/// Note the generated trait's methods will *not* have exactly the signatures written in the trait block. Instead, given a Role defined by:
 /// ```ignore
 /// #[role]
 /// trait MyRole {
@@ -238,10 +242,10 @@ fn performance_internal(
 /// ```
 /// An actor implementing this role via a [`macro@performance`] block will have a method with the following signature:
 /// ```ignore
-/// fn a_method(&self, input: u32) -> Envelope<dyn MyRole, ReturnType>;
+/// fn a_method(&self, input: u32) -> Envelope<Actor, ReturnType>;
 /// ```
 ///
-/// Calling this method won't immediately do any work - see the documentation for [`Envelope`]
+/// Calling `a_method` won't immediately do any work - see the documentation for [`Envelope`](https://docs.rs/shakespeare/latest/shakespeare/struct.Envelope.html)
 #[proc_macro_attribute]
 pub fn role(attr: TokenStream, item: TokenStream) -> TokenStream {
 	role_internal(attr.into(), item.into()).into()

@@ -20,7 +20,7 @@ fn find_attribute(attrs: &mut Vec<Attribute>, needle: &str) -> Option<Attribute>
 						index = Some(ind);
 					}
 				}
-				Meta::NameValue(_) => continue,
+				Meta::NameValue(_) => { /* continue */ }
 			}
 		}
 	}
@@ -143,7 +143,8 @@ pub fn expand_all_tests() -> Result<(), Error> {
 		let new_path = dest.join(test_file.path().strip_prefix(&root)?);
 
 		if test_file.metadata()?.is_dir() {
-			create_dir_all(&new_path).unwrap_or_else(|_| panic!("{new_path:?} invalid to create"));
+			create_dir_all(&new_path)
+				.unwrap_or_else(|_| panic!("{} invalid to create", new_path.display()));
 			continue;
 		}
 		let contents = std::fs::read_to_string(test_file.path())?;

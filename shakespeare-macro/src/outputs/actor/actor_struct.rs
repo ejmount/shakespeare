@@ -62,7 +62,7 @@ impl ActorStruct {
 impl ToTokens for ActorStruct {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.strukt.to_tokens(tokens);
-		self.meta_traits.each_ref().map(|f| f.to_tokens(tokens));
+		let _ = self.meta_traits.each_ref().map(|f| f.to_tokens(tokens));
 		self.sender_method_name_impl.to_tokens(tokens);
 	}
 }
