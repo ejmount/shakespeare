@@ -48,7 +48,7 @@ mod Client {
 
 		/// Send a message to the network socket
 		async fn send_out(&mut self, msg: String) {
-			self.out_stream.send(msg).await.unwrap();
+			self.out_stream.send(msg).await.unwrap(); // If this fails that's fine, the server will respond to the panic
 		}
 	}
 }
@@ -113,7 +113,7 @@ mod Server {
 		// A client left and the actor shutdown
 		async fn client_leaves(&mut self, outcome: ActorOutcome<Client>) {
 			match outcome {
-				ActorOutcome::Exit(client_id) => {
+				ActorOutcome::Exit(client_id) | ActorOutcome::Panic(client_id) => {
 					self.client_leaves(client_id).await;
 				}
 				_ => unimplemented!(),
