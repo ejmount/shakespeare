@@ -41,7 +41,7 @@ impl SpawningFunction {
 			izip!(performances, &input_field_names, &output_field_names),
 			|(role, inn, out)| -> Result<Stmt> {
 				let role_name = &role.role_name;
-				fallible_quote! { let (#inn, mut #out) = <dyn #role_name as ::shakespeare::Role>::Channel::new_default(); }
+				fallible_quote! { let (#inn, mut #out) = <dyn #role_name as ::shakespeare::Role>::Channel::new(Default::default()); }
 			}
 		);
 

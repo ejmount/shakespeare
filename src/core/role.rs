@@ -32,15 +32,6 @@ pub trait Channel {
 	type Receiver: Receiver<Self::Item>;
 	/// Construct a new channel
 	fn new(init: Self::Input) -> (Self::Sender, Self::Receiver);
-
-	#[must_use]
-	/// A convenience if the channel has a default parameters
-	fn new_default() -> (Self::Sender, Self::Receiver)
-	where
-		Self::Input: Default,
-	{
-		Self::new(Self::Input::default())
-	}
 }
 
 /// A Role that an Actor can implement.
