@@ -22,7 +22,7 @@ dialoguer = "0.11.0"
 syn = { version = "2.0.79", features = ["full", "fold", "visit", "extra-traits"] }
 proc-macro2 = "1.0.87"
 quote = "1.0.37"
-itertools = "0.13.0"
+itertools = "0.14.0"
 convert_case = "0.6.0"
 structmeta = "0.3.0"
 walkdir = "2.5.0"
