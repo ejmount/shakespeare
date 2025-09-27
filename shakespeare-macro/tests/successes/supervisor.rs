@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::mem::drop;
 use std::time::Duration;
 
 use shakespeare::{actor, send_future_to, ActorOutcome, ActorSpawn, Context};
@@ -20,7 +21,7 @@ pub mod Supervisor {
 	impl Starter for SupervisorState {
 		async fn go(&mut self, ctx: &'_ mut Context<Self>) {
 			let ActorSpawn {
-				msg_handle,
+				actor_handle,
 				join_handle,
 				..
 			} = Worker::start(WorkerState {
@@ -28,10 +29,10 @@ pub mod Supervisor {
 				count:   0,
 			});
 			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
-			msg_handle.work().await.unwrap();
+			actor_handle.work().await.unwrap();
 
 			let ActorSpawn {
-				msg_handle,
+				actor_handle,
 				join_handle,
 				..
 			} = Worker::start(WorkerState {
@@ -39,10 +40,10 @@ pub mod Supervisor {
 				count:   0,
 			});
 			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
-			msg_handle.work().await.unwrap();
+			actor_handle.work().await.unwrap();
 
 			let ActorSpawn {
-				msg_handle,
+				actor_handle,
 				join_handle,
 				..
 			} = Worker::start(WorkerState {
@@ -52,7 +53,7 @@ pub mod Supervisor {
 			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
 
 			sleep(Duration::from_millis(500)).await;
-			drop(msg_handle);
+			drop(actor_handle);
 		}
 	}
 
@@ -113,13 +114,13 @@ pub mod Worker {
 #[tokio::test]
 async fn main() {
 	let ActorSpawn {
-		msg_handle,
+		actor_handle,
 		join_handle,
 		..
 	} = Supervisor::start(SupervisorState::default());
 
-	let _ = msg_handle.go().await;
-	drop(msg_handle);
+	let _ = actor_handle.go().await;
+	drop(actor_handle);
 
 	assert_eq!(join_handle.await, ActorOutcome::Exit(true));
 }
