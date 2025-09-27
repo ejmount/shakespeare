@@ -114,17 +114,17 @@ where
 	A: Shell,
 {
 	/// A handle for sending messages to the actor
-	pub msg_handle:  Arc<A>,
+	pub actor_handle: Arc<A>,
 	/// A future for awaiting the actor's completion
-	pub join_handle: Handle<A>,
+	pub join_handle:  Handle<A>,
 }
 
 impl<A: Shell> Spawn<A> {
 	#[doc(hidden)]
 	pub fn new(actor: Arc<A>, handle: JoinHandle<Result<A::ExitType, A::PanicType>>) -> Spawn<A> {
 		Spawn {
-			msg_handle:  actor,
-			join_handle: Handle::new(handle),
+			actor_handle: actor,
+			join_handle:  Handle::new(handle),
 		}
 	}
 }

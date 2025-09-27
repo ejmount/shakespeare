@@ -38,8 +38,8 @@ async fn main() {
 	let olaf = ActorState {
 		sender: Dropper(sender),
 	};
-	let shakespeare::ActorSpawn { msg_handle, .. } = Actor::start(olaf);
-	let f = msg_handle.speak(40);
+	let shakespeare::ActorSpawn { actor_handle, .. } = Actor::start(olaf);
+	let f = actor_handle.speak(40);
 	f.await.unwrap();
 	assert_eq!(recv.recv().await.unwrap(), 40);
 	//std::mem::drop(actor);
