@@ -41,7 +41,7 @@ pub async fn main() {
 	use role::RoleTrait;
 	use shakespeare::ActorSpawn;
 
-	let ActorSpawn { msg_handle, .. } = self::actor::new(FooState {});
-	let ptr: Arc<dyn RoleTrait> = msg_handle;
+	let ActorSpawn { actor_handle, .. } = self::actor::new(FooState {});
+	let ptr: Arc<dyn RoleTrait> = actor_handle;
 	ptr.handler().await.unwrap();
 }

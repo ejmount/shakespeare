@@ -25,12 +25,12 @@ pub mod CounterActor {
 #[tokio::test]
 async fn main() {
 	let ActorSpawn {
-		msg_handle,
+		actor_handle,
 		join_handle,
 		..
 	} = CounterActor::start(ActorState::default());
 
-	let counter: Arc<dyn Counter> = msg_handle;
+	let counter: Arc<dyn Counter> = actor_handle;
 
 	let numbers = futures::stream::iter(0..10);
 	send_stream_to(numbers, counter);

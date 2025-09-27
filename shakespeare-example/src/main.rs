@@ -160,7 +160,7 @@ async fn main() {
 
 	let server = Server::start(ServerState::default());
 
-	send_stream_to::<dyn NetListener, _>(client_stream, server.msg_handle);
+	send_stream_to::<dyn NetListener, _>(client_stream, server.actor_handle);
 
 	server.join_handle.await;
 }
