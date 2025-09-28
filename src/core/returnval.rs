@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::future::IntoFuture;
 use std::marker::PhantomData;
-use std::pin::{pin, Pin};
+use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
