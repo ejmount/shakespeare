@@ -93,7 +93,7 @@ impl SpawningFunction {
 					use tokio::{select, pin};
 					use tokio::time::{sleep, Duration, Instant};
 
-					const IDLE_TIMEOUT: Duration = Duration::from_millis(50);
+					const IDLE_TIMEOUT: Duration = Duration::from_secs(1);
 
 					#(#queue_constructions)*
 					let actor = Arc::new_cyclic(|weak| { #constructor });
