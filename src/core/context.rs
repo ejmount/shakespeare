@@ -33,7 +33,7 @@ impl<A: State + ?Sized> Context<A> {
 	}
 
 	#[must_use]
-	/// Gets a handle to the surrounding actor
+	/// Gets a handle to the surrounding actor shell
 	pub fn get_shell(&self) -> Arc<A::ShellType> {
 		self.shell_handle.clone()
 	}
