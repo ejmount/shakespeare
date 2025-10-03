@@ -13,18 +13,18 @@ description = "A support crate for the shakespeare actor framework"
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0.87"
-quote = "1.0.37"
-syn = { version = "2.0.79", features = ["full", "fold", "extra-traits"] }
-convert_case = "0.6.0"
-itertools = "0.13.0"
+proc-macro2 = "1.0.101"
+quote = "1.0.41"
+syn = { version = "2.0.106", features = ["full", "fold", "extra-traits"] }
+convert_case = "0.8.0"
+itertools = "0.14.0"
 structmeta = "0.3.0"
 visibility = "0.1.1"
 
 [dev-dependencies]
 futures = "0.3.31"
-runtime-macros = "1.1.0"
+runtime-macros = "1.1.1"
 shakespeare = { path = ".." }
-tokio = "1.40.0"
-tokio-stream = { version = "0.1.16", features = ["net"] }
-tokio-util = { version = "0.7.12", features = ["codec", "net"] }
+tokio = "1.47.1"
+tokio-stream = { version = "0.1.17", features = ["net"] }
+tokio-util = { version = "0.7.16", features = ["codec", "net"] }
