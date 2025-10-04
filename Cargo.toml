@@ -11,7 +11,7 @@ keywords = ["async", "macro", "futures"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = [ "shakespeare-example","shakespeare-macro", "xtask"]
+members = [ "shakespeare-macro", "xtask"]
 
 [workspace.package]
 version = "0.0.2"
@@ -32,3 +32,7 @@ pin-project = "1.1.10"
 
 [dev-dependencies]
 trybuild = "1.0.111"
+tokio-util = { version = "0.7.16", features = ["codec"] }
+tokio = { version = "1.47.1", features = ["net"] }
+futures = "0.3.31"
+tokio-stream = { version = "0.1.17", features = ["net"] }
