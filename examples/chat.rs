@@ -32,7 +32,7 @@ mod Client {
 		self.id
 	}
 
-	/// This would run if any message handlers panic
+	/// This would run  message handlers panic
 	fn catch(self, _err: Box<dyn Any + Send>) -> usize {
 		self.id
 	}
@@ -76,7 +76,7 @@ mod Client {
 			}
 		}
 
-		/// Send a message to the network socket
+		/// Send a message to the network socket, passing up any error
 		async fn send_out(&mut self, msg: String) -> Result<(), LinesCodecError> {
 			self.out_stream.send(msg).await
 		}
@@ -99,18 +99,20 @@ mod Server {
 			let mut dead = vec![];
 			for (id, user) in &self.users {
 				let msg_success = user.send_out(msg.clone()).await;
+				// Check for both successfully sending the message to the actor, and the message
+				// executing successfully
 				if !matches!(msg_success, Ok(Ok(_))) {
 					dead.push(*id);
 				}
 			}
 			for dead in dead {
-				Box::pin(self.client_leaves(dead)).await;
+				Box::pin(self.remove_client(dead)).await;
 			}
 		}
 
 		/// Removes the tracking data of a disconnected client and announce the departure.
 		/// Needs to be separate from [`MsgRelay::client_leaves`] to be able to call from other methods inside the actor.
-		async fn client_leaves(&mut self, client_id: usize) {
+		async fn remove_client(&mut self, client_id: usize) {
 			self.users.remove(&client_id);
 			self.broadcast(format!("User {client_id} has left\n")).await;
 		}
@@ -129,7 +131,7 @@ mod Server {
 		async fn client_leaves(&mut self, outcome: ActorOutcome<Client>) {
 			match outcome {
 				ActorOutcome::Exit(client_id) | ActorOutcome::Panic(client_id) => {
-					self.client_leaves(client_id).await;
+					self.remove_client(client_id).await;
 				}
 				_ => unimplemented!(),
 			}
@@ -156,11 +158,16 @@ async fn main() {
 		.await
 		.expect("Can't listen on port 8000, is it free?");
 
+	// Get the client stream from the Listener. Fine to panic if this somehow causes an IO failure.
 	let client_stream = TcpListenerStream::new(listener).filter_map(|r| async { r.ok() });
 
-	let server = Server::start(ServerState::default());
+	let ActorSpawn {
+		actor_handle,
+		join_handle,
+		..
+	} = Server::start(ServerState::default());
 
-	send_stream_to::<dyn NetListener, _>(client_stream, server.actor_handle);
+	send_stream_to::<dyn NetListener, _>(client_stream, actor_handle);
 
-	server.join_handle.await;
+	join_handle.await;
 }
