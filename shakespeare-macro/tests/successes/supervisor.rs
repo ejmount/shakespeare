@@ -2,13 +2,14 @@ use std::any::Any;
 use std::mem::drop;
 use std::time::Duration;
 
-use shakespeare::{actor, send_future_to, ActorOutcome, ActorSpawn, Context};
+use shakespeare::{actor, ActorOutcome, ActorSpawn, Context, Message};
 use tokio::time::sleep;
 
 type Panic = Box<dyn Any + Send>;
 
 #[actor]
 pub mod Supervisor {
+	use std::sync::Arc;
 
 	#[derive(Default)]
 	pub struct SupervisorState {
@@ -28,7 +29,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
+			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
 			actor_handle.work().await.unwrap();
 
 			let ActorSpawn {
@@ -39,7 +40,7 @@ pub mod Supervisor {
 				success: false,
 				count:   0,
 			});
-			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
+			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
 			actor_handle.work().await.unwrap();
 
 			let ActorSpawn {
@@ -50,7 +51,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			send_future_to::<dyn Listening, _>(join_handle, ctx.get_shell());
+			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
 
 			sleep(Duration::from_millis(500)).await;
 			drop(actor_handle);
@@ -87,16 +88,13 @@ pub mod Worker {
 	impl Work for WorkerState {
 		async fn work(&mut self, ctx: &'_ mut Context<Self>) {
 			self.count += 1;
-			let sleep = sleep(Duration::from_millis(50));
-			send_future_to::<dyn Sleeper, _>(sleep, ctx.get_shell());
+			sleep(Duration::from_millis(50)).send_to(ctx.get_shell() as Arc<dyn Sleeper>);
 		}
 	}
 	#[performance(canonical)]
 	impl Sleeper for WorkerState {
 		fn wake(&mut self, _wake: ()) {
-			if self.success {
-				return;
-			} else {
+			if !self.success {
 				panic!()
 			}
 		}

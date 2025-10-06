@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::sync::Arc;
 
-use shakespeare::{actor, send_stream_to, ActorOutcome, ActorSpawn};
+use shakespeare::{actor, ActorOutcome, ActorSpawn, MessageStream};
 
 #[actor]
 pub mod CounterActor {
@@ -33,7 +33,7 @@ async fn main() {
 	let counter: Arc<dyn Counter> = actor_handle;
 
 	let numbers = futures::stream::iter(0..10);
-	send_stream_to(numbers, counter);
+	numbers.send_to(counter);
 
 	assert_eq!(join_handle.await, ActorOutcome::Exit(45));
 }

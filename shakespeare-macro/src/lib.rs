@@ -228,7 +228,7 @@ fn performance_internal(
 /// 3. all other parameters and all return types must have a lifetime of `'static`
 /// 4. Neither methods nor parameters can have "unbound" generic parameters, nor use `impl Trait` in either parameter or return position. (`Option<u32>` is allowed, `Option<T>` is not)
 ///
-/// Role methods may be async, and if they are, may `await` other futures. However, be aware that the actor's message loop will be blocked while awaiting - this risks deadlocks if other actors have sent it messages and are waiting for the return values. [`send_reply_to`](https://docs.rs/shakespeare/latest/shakespeare/fn.send_reply_to.html) may be useful to avoid this situation.
+/// Role methods may be async, and if they are, may `await` other futures. However, be aware that the actor's message loop will be blocked while awaiting - this risks deadlocks if other actors have sent it messages and are waiting for the return values. [`Envelope::forward_to`](https://docs.rs/shakespeare/latest/shakespeare/struct.Envelope.html#method.forward_to) may be useful to avoid this situation.
 ///
 /// Except for the above restrictions, a role is otherwise a normal trait and its methods can have any number of methods, input parameters, and return values of any type.
 /// (Be aware that, as with any other trait, extremely large inline types may cause performance impacts - these can be avoided by passing `Box` etc instead)
