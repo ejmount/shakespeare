@@ -3,22 +3,24 @@
 //! Inputs are lines of UTF-8 text, which must end in `\n` specifically as per [`LinesCodec`]
 use std::any::Any;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
-use shakespeare::{actor, send_future_to, send_stream_to, ActorOutcome, ActorSpawn, Context};
+use shakespeare::{actor, ActorOutcome, ActorSpawn, Context, Message, MessageStream};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::wrappers::TcpListenerStream;
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 
-static ID_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
+static ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 /// This actor represents a connected client and manages the network socket to that client.
 #[actor]
-mod Client {
+pub mod Client {
+
 	/// [`Client`] internal state, tracking an ID number to identify the client, the socket and handle to a Relay.
-	struct UserState {
+	pub struct UserState {
 		id:         usize,
 		relay:      Arc<dyn MsgRelay>,
 		out_stream: SplitSink<Framed<TcpStream, LinesCodec>, String>,
@@ -32,7 +34,8 @@ mod Client {
 		self.id
 	}
 
-	/// This would run  message handlers panic
+	/// This would run when message handlers panic, such as on IO error on write
+	/// (We don't distinguish this from a graceful exit for simplicity)
 	fn catch(self, _err: Box<dyn Any + Send>) -> usize {
 		self.id
 	}
@@ -52,8 +55,8 @@ mod Client {
 				relay: relay.clone(),
 				out_stream,
 			});
-			send_stream_to::<dyn NetClient, _>(in_stream, actor_handle.clone());
-			send_future_to(join_handle, relay);
+			in_stream.send_to(actor_handle.clone() as Arc<dyn NetClient>);
+			join_handle.send_to(relay);
 
 			actor_handle
 		}
@@ -76,7 +79,7 @@ mod Client {
 			}
 		}
 
-		/// Send a message to the network socket, passing up any error
+		/// Send a message to the network socket, passing up any error to the caller
 		async fn send_out(&mut self, msg: String) -> Result<(), LinesCodecError> {
 			self.out_stream.send(msg).await
 		}
@@ -86,9 +89,9 @@ mod Client {
 /// An actor representing the central network loop.
 /// This both sets incoming clients and relays incoming messages among the clients that already exist.
 #[actor]
-mod Server {
+pub mod Server {
 	#[derive(Default)]
-	struct ServerState {
+	pub struct ServerState {
 		users: HashMap<usize, Arc<dyn NetClient>>,
 	}
 
@@ -127,7 +130,7 @@ mod Server {
 		}
 
 		/// A client left and the actor shutdown, so tell everyone.
-		/// The existence of this method triggers the Role macro to implement implement [`shakespeare::Accepts<ActorOutcome<Client>>`] for `MsgRelay`, which then allows `send_future_to` to accept the join handle from spawning a `Client`.
+		/// The existence of this method triggers the Role macro to implement implement [`shakespeare::Accepts<ActorOutcome<Client>>`] for `MsgRelay`, which then allows [`Message::send_to`] to accept the join handle from spawning a `Client`.
 		async fn client_leaves(&mut self, outcome: ActorOutcome<Client>) {
 			match outcome {
 				ActorOutcome::Exit(client_id) | ActorOutcome::Panic(client_id) => {
@@ -144,7 +147,7 @@ mod Server {
 		/// Set up a newly arrived client up with a new actor to represent them and handle their messages.
 		/// Also announces the new entry to existing clients.
 		async fn listen(&mut self, ctx: &'_ mut Context<ServerState>, tcp_client: TcpStream) {
-			let id = ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+			let id = ID_COUNTER.fetch_add(1, Ordering::AcqRel);
 			let actor = Client::new(ctx.get_shell(), tcp_client, id);
 			self.users.insert(id, actor);
 			self.broadcast(format!("User {id} has entered\n")).await;
@@ -158,7 +161,7 @@ async fn main() {
 		.await
 		.expect("Can't listen on port 8000, is it free?");
 
-	// Get the client stream from the Listener. Fine to panic if this somehow causes an IO failure.
+	// Get the client stream from the Listener. Fine to drop anything that causes an IO failure.
 	let client_stream = TcpListenerStream::new(listener).filter_map(|r| async { r.ok() });
 
 	let ActorSpawn {
@@ -167,7 +170,7 @@ async fn main() {
 		..
 	} = Server::start(ServerState::default());
 
-	send_stream_to::<dyn NetListener, _>(client_stream, actor_handle);
+	client_stream.send_to(actor_handle as Arc<dyn NetListener>);
 
 	join_handle.await;
 }

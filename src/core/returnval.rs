@@ -9,7 +9,7 @@ use futures::Future;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::{Receiver, Sender};
 
-use crate::{send_future_to, Accepts, Emits, Role, Role2SendError};
+use crate::{Accepts, Emits, Message, Role, Role2SendError};
 
 type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
 
@@ -59,7 +59,7 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 /// 1. nothing - that is, allowing it to drop will dispatch the message and have any return value thrown away, but *will not* wait for the message delivery to complete.
 /// 2. awaiting this value will wait for the actor to recive and process the message, then yield the return value to the caller
 /// 3. calling [`ignore()`][`Envelope::ignore`] and awaiting the resulting future *will wait* for the message to be sent, but will not wait for any return value.
-/// 4. calling [`send_return_to`][`crate::send_reply_to`] will send the return value directly to a given actor's mailbox.
+/// 4. calling [`forward_to`][`Envelope::forward_to`] will send the return value directly to a given actor's mailbox.
 ///
 /// **NB**: In case 1, there is no ordering established with other messages sent to the same receiver, even from the same sender. In all other cases, multiple messages to the same receiver from a given sender will be received in sending order. In all cases, ordering between messages sent to different receivers or from different senders is unspecified.
 #[derive(Debug)]
@@ -113,6 +113,42 @@ where
 		})
 		.await
 	}
+
+	/// Arranges for the *return value* produced by processing the given [`Envelope`] to be forwarded to the given actor. Any return value produced by the receipient is ignored.
+	///
+	/// An actor may want to call this method using its own handle as the destination, so that it receives the `Envelope`'s return value without `await`ing inside the message handler that's making the call, which would pause the event loop as a whole. However, tying this return value back to the message that led to the call currently has no specific support and is left to the developer.
+	///
+	/// Equivalent to, but more efficient than, passing the same parameters to [`Message::send_to`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
+	///
+	/// # Errors
+	///
+	/// Can return an Err if the actor originating the Envelope stops before the Envelope's return value is delivered to the recipient
+	pub async fn forward_to<RxRole>(
+		self,
+		recipient: Arc<RxRole>,
+	) -> Result<(), Role2SendError<DestRole>>
+	where
+		RxRole: Accepts<Output> + 'static,
+	{
+		let (payload, original) = self.unpack();
+
+		let bridge_to_rx_role = |sender_payload| -> Pin<Box<dyn Future<Output = ()> + Send>> {
+			let discard_envelope = ReturnEnvelope {
+				return_path: ReturnPath::Discard,
+				payload:     RxRole::into_payload(DestRole::from_return_payload(sender_payload)),
+			};
+			Box::pin(async move {
+				let _ = recipient.enqueue(discard_envelope).await;
+			})
+		};
+
+		let val: ReturnEnvelope<DestRole> = ReturnEnvelope {
+			return_path: ReturnPath::Mailbox(Box::new(bridge_to_rx_role)),
+			payload,
+		};
+
+		original.enqueue(val).await
+	}
 }
 
 impl<DestRole, Output> IntoFuture for Envelope<DestRole, Output>
@@ -153,7 +189,7 @@ where
 		let val = self.val.take().unwrap();
 		let dest = self.dest.take().unwrap();
 
-		send_future_to(std::future::ready(val), dest);
+		std::future::ready(val).send_to(dest);
 	}
 }
 

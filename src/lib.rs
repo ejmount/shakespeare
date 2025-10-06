@@ -24,9 +24,9 @@
 //! * `await` it - an `Envelope` implements `IntoFuture` and will yield a value of `Ok(T)` assuming there are no problems with data transfer to the actor.
 //! * allow it to drop, which will dispatch the message to the destination actor's mailbox but not wait for any return value.
 //!
-//! Actors can also receive general [`Future`] and [`Stream`] values to their mailboxes, using [`send_future_to`] and [`send_stream_to`]. The types these functions can work on are specified by what implementations of the [`Accepts`] trait the actor has, see that trait documentation for details.
+//! Actors can also receive general [`Future`] and [`futures::Stream`] values to their mailboxes, using [`Message::send_to`] and [`MessageStream::send_to`]. The types these functions can work on are specified by what implementations of the [`Accepts`] trait the actor has, see that trait documentation for details.
 //!
-//! **Note**: The API is designed to allow code to work with dynamically typed actors of a given role by using values of type `Arc<dyn Role>`, which `Arc<A>` can be upcast to by normal language rules. This construction does mean that the compiler may need help to correctly disambiguate [`send_future_to`] (and similar) calls.
+//! **Note**: The API is designed to allow code to work with dynamically typed actors of a given role by using values of type `Arc<dyn Role>`, which `Arc<A>` can be upcast to by normal language rules. This construction does mean that the compiler may need help to correctly disambiguate [`Message::send_to`] (and similar) calls.
 //!
 //!
 //! ## Defining an actor
@@ -63,7 +63,7 @@
 //!
 //! For methods inside a performance block, `Self` refers to the state type. (e.g. `SomeState` above) The above is the "strongest" form of signature - method implementations that do not `await` anything or mutate the state object do not have to include the respective keywords.
 //!
-//! **N.B.** While an actor's message handler can `await` futures (whether from an [`Envelope`] or otherwise) the event loop cannot resume until the method returns. This risks deadlocks where two actors end up awaiting replies from each other. If you need to handle the return value from calling another actor without blocking the original sender by waiting on it, consider using [`send_future_to`] or [`send_reply_to`] and passing the sender's handle.
+//! **N.B.** While an actor's message handler can `await` futures (whether from an [`Envelope`] or otherwise) the event loop cannot resume until the method returns. This risks deadlocks where two actors end up awaiting replies from each other. If you need to handle the return value from calling another actor without blocking the original sender by waiting on it, consider using [`Message::send_to`] or [`MessageStream::send_to`] and passing the sender's handle.
 //!
 //! A performance implementation is allowed to be outside of the actor `mod` scope, in the same way that any other `impl ... for` block can be anywhere within the crate, but if it is elsewhere, the `mod` must contain a `#[performance] impl ARole for MyActor {}` block, including empty braces.
 //!
@@ -118,7 +118,7 @@
 //!
 //! 1. If a message handler panics, `catch` is called (or the panic value passed straight up to the [`ActorHandle`] if there is no `catch`) immediately. No further messages are processed, and attempting to send messages to the actor will fail by returning `Err` to the caller.
 //! 2. If the [`Context::stop`] is called, no further messages are processed, calls against the actor will return `Err`, but the actor's `stop` function is called rather than `catch`. This similarly passes the returned value up to the [`ActorHandle`].
-//! 3. If the `Arc` that was returned from `start` and all of its copies drop, *and* no further messages are waiting to be processed, `stop` will be called as in case 2. By definition, it is not possible for an external client to be sending messages to the actor at this point. (Note that functions directly subscribing the actor to a future result, such as [`send_stream_to`] implicitly hold an `Arc` and will preclude this case until that value yields.)
+//! 3. If the `Arc` that was returned from `start` and all of its copies drop, *and* no further messages are waiting to be processed, `stop` will be called as in case 2. By definition, it is not possible for an external client to be sending messages to the actor at this point. (Note that functions directly subscribing the actor to a future result, such as [`MessageStream::send_to`] implicitly hold an `Arc` and will preclude this case until that value yields to exhaustion.)
 //!
 //! **N.B:** Because method implementations can get hold of the actor's own handle via the [`Context`], then even if all other copies have dropped at any given time, a running event handler can "save" the actor by sending a new copy of the handle out of the actor. This is not treated as the actor being revived from having shut down, but instead it has not shut down in the first place.
 //!
@@ -140,8 +140,6 @@
 
 use std::any::Any;
 use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
 
 #[doc(hidden)]
 pub use ::async_trait as async_trait_export;
@@ -152,6 +150,7 @@ pub use shakespeare_macro::{actor, performance, role};
 pub use tokio::TokioUnbounded;
 
 mod core;
+mod sendable;
 mod tokio;
 
 pub use core::{
@@ -164,7 +163,7 @@ pub use core::{
 	Sender as RoleSender,
 };
 
-use futures::{pin_mut, Stream, StreamExt};
+pub use sendable::{Message, MessageStream};
 
 #[doc(hidden)]
 pub type Role2Payload<R> = <R as Role>::Payload;
@@ -184,93 +183,6 @@ where
 	T: Future,
 {
 	futures::future::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(fut))
-}
-
-/// Subscribes an actor to a stream, delivering each item of the stream to the actor's mailbox.
-///
-/// The type constraints ensure that it is unambigious which method handler this will dispatch to.
-///
-/// This function does not do anything to inform the actor when the stream closes, successfuly or otherwise. If sending the stream item to the actor fails, the stream will be dropped. If an actor explicitly shuts down with an active stream, the stream will be dropped with any remaining items unread. A sent stream prevents an actor shutting down from zero remaining handles until the stream runs out, and conversely, the stream running out will release the held handle.
-pub fn send_stream_to<R, S>(stream: S, actor: Arc<R>)
-where
-	R: Accepts<S::Item> + ?Sized + 'static,
-	S: Stream + Send + 'static,
-	<S as Stream>::Item: Send,
-{
-	tokio_export::spawn(async move {
-		pin_mut!(stream);
-		while let Some(msg) = stream.next().await {
-			let payload = R::into_payload(msg);
-			let envelope = ReturnEnvelope {
-				payload,
-				return_path: ReturnPath::Discard,
-			};
-			if actor.enqueue(envelope).await.is_err() {
-				break;
-			}
-		}
-	});
-}
-
-/// Send a future value to an actor.
-///
-/// The future's output will be delivered to the actor's mailbox when it resolves.
-/// The type constraints ensure that the actor has an unambigious interpretation of the incoming value.
-///
-/// See also [`send_stream_to`] if you have a stream of items to deliver rather than a single value.
-///
-/// **N.B**: this function retains the `Arc<dyn Role>` for as long as the future is pending, and will keep the actor alive for that time.
-pub fn send_future_to<R, F>(fut: F, actor: Arc<R>)
-where
-	R: Accepts<F::Output> + ?Sized + 'static,
-	F: Future + Send + 'static,
-{
-	tokio_export::spawn(async move {
-		let actor = actor;
-		let payload = R::into_payload(fut.await);
-		let envelope = ReturnEnvelope {
-			payload,
-			return_path: ReturnPath::Discard,
-		};
-		let _ = actor.enqueue(envelope).await;
-	});
-}
-
-/// Arranges for the *return value* produced by processing the given [`Envelope`] to be forwarded to the recipient actor. Any return value produced by the receipient is ignored.
-///
-/// An actor may want to call this method using its own handle as the destination, so that it receives the `Envelope`'s return value without `await`ing inside the message handler that's making the call, which would pause the event loop as a whole. However, tying this return value back to the message that led to the `send_reply_to` call currently has no specific support and is left to the developer.
-///
-/// Equivalent to, but more efficient than, passing the same parameters to [`send_future_to`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
-///
-/// # Errors
-///
-/// Can return an Err if the actor originating the Envelope stops before the Envelope is delivered to the recipient
-pub async fn send_reply_to<RxRole, SendingRole, BridgeType>(
-	env: Envelope<SendingRole, BridgeType>,
-	recipient: Arc<RxRole>,
-) -> Result<(), Role2SendError<SendingRole>>
-where
-	SendingRole: Emits<BridgeType> + ?Sized + 'static,
-	RxRole: Accepts<BridgeType> + ?Sized + 'static,
-{
-	let (payload, original) = env.unpack();
-
-	let bridge_to_rx_role = |sender_payload| -> Pin<Box<dyn Future<Output = ()> + Send>> {
-		let discard_envelope = ReturnEnvelope {
-			return_path: ReturnPath::Discard,
-			payload:     RxRole::into_payload(SendingRole::from_return_payload(sender_payload)),
-		};
-		Box::pin(async move {
-			let _ = recipient.enqueue(discard_envelope).await;
-		})
-	};
-
-	let val: ReturnEnvelope<SendingRole> = ReturnEnvelope {
-		return_path: ReturnPath::Mailbox(Box::new(bridge_to_rx_role)),
-		payload,
-	};
-
-	original.enqueue(val).await
 }
 
 #[doc(hidden)]
