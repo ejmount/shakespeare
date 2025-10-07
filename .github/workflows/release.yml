@@ -2,6 +2,12 @@ name: Mint Release
 
 on:
     workflow_dispatch:
+        inputs:
+            dry-run:
+                description: "Dry-run cargo publish and mark the GH release as prerelease"
+                required: false
+                type: boolean
+
 
 jobs:
     publish:
@@ -20,54 +26,20 @@ jobs:
 
             - name: Get release tag
               id: release-tag
-            # Using shell: bash explicitly because it turns on safety features like pipefail
+              # Using shell: bash explicitly because it turns on safety features like pipefail
               shell: bash
               run: |
                 echo "tag=v$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "shakespeare").version')" >> "$GITHUB_OUTPUT"
 
-            - name: Check for pre-existing release
-              id: safety
-              env:
-                tag: ${{ steps.release-tag.outputs.tag }}
-                GH_TOKEN: ${{ github.token }}
-              shell: bash
-              run: |
-                if gh release view ${{ env.tag }} >/dev/null 2>&1; then
-                echo "check=false" >> "$GITHUB_OUTPUT"
-                else
-                echo "check=true" >> "$GITHUB_OUTPUT"
-                fi
-
-            - name: Create Github Release
-              id: create_release
-              uses: actions/create-release@v1
-              if: steps.safety.outputs.check == 'true'
-              env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Release
+              uses: softprops/action-gh-release@v2
               with:
-                tag_name: "${{ steps.release-tag.outputs.tag }}"
-                release_name: Release ${{ steps.release-tag.outputs.tag }}
-                draft: true
-                prerelease: false
-
+                name: ${{ steps.release-tag.outputs.tag }}
+                draft: ${{ inputs.dry-run }}
+                prerelease: ${{ inputs.dry-run }}
 
             - name: Publish to Crates.io
               uses: katyo/publish-crates@v2
               with:
-                dry-run: true
+                dry-run: ${{ inputs.dry-run }}
                 registry-token: ${{ secrets.CRATESIO_TOKEN }}
-
-            - name: Tag release
-              shell: bash
-              run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git tag -a -m "Release ${{ steps.release-tag.outputs.tag }}" ${{ steps.release-tag.outputs.tag }}
-                  git push --tags
-              # https://github.com/actions/checkout?tab=readme-ov-file#push-a-commit-using-the-built-in-token
-
-
-
-
-
-

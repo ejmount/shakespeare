@@ -17,12 +17,7 @@ jobs:
           submodules: true
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
+        run: rustup toolchain install stable nightly --profile minimal --component rustfmt,clippy
 
       - uses: Swatinem/rust-cache@v1
         with:
@@ -34,16 +29,10 @@ jobs:
           command: check
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -p shakespeare-macro -p shakespeare -- --check
+        run:  rustup run nightly cargo fmt -p shakespeare-macro -p shakespeare -- --check
 
       - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-            command: clippy
-            args: -- -D warnings
+        run:  rustup run stable cargo clippy -p shakespeare-macro -p shakespeare -- -D warnings
 
   test:
     name: Test Suite
