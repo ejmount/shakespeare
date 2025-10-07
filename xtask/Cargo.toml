@@ -1,6 +1,6 @@
 [package]
 name = "xtask"
-version = "0.0.0" # Don't want to publish this
+publish = false # Don't want to publish this
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -13,7 +13,7 @@ name = "xtask"
 
 [dependencies]
 anyhow = "1.0.100"
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.5.49", features = ["derive"] }
 duct = "1.1.0"
 colored = "3.0.0"
 fs_extra = "1.3.0"
@@ -33,7 +33,7 @@ walkdir = "2.5.0"
 
 [dev-dependencies]
 shakespeare = { path = ".." } # Doesn't need a version because this crate isn't published
-trybuild = "1.0.111"
-tokio = "1.47.1"
+trybuild = "1.0.112"
+tokio = "1.48.0"
 runtime-macros = "1.1.1"
 futures = "0.3.31"
