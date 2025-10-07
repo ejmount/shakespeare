@@ -14,17 +14,17 @@ keywords = ["async", "macro", "futures"]
 members = [ "shakespeare-macro", "xtask"]
 
 [workspace.package]
-version = "0.0.2"
+version = "0.1.0-rc1"
 authors = ["Ewan Mount"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ejmount/shakespeare"
-edition = "2021"
+edition = "2024"
 
 
 [dependencies]
 async-trait = "0.1.89"
 tokio = { version = "1.47.1", features = ["macros", "full"] }
-shakespeare-macro = { path = "shakespeare-macro", version = "=0.0.2" }
+shakespeare-macro = { path = "shakespeare-macro", version = "0.1.0-rc1" }
 futures = "0.3.31"
 trait-variant = "0.1.2"
 pin-project = "1.1.10"
