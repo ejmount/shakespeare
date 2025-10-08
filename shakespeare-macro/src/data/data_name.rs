@@ -1,5 +1,5 @@
 use quote::ToTokens;
-use syn::{parse_quote, TypePath};
+use syn::{TypePath, parse_quote};
 
 use super::ActorName;
 

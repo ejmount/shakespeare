@@ -2,7 +2,7 @@ use convert_case::Case::Snake;
 use convert_case::Casing;
 use itertools::Itertools;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use syn::parse::Parser;
 use syn::{Arm, Attribute, Expr, Ident, ItemImpl, Path, Result};
 

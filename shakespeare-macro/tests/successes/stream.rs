@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::sync::Arc;
 
-use shakespeare::{actor, ActorOutcome, ActorSpawn, MessageStream};
+use shakespeare::{ActorOutcome, ActorSpawn, MessageStream, actor};
 
 #[actor]
 pub mod CounterActor {

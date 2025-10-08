@@ -1,7 +1,7 @@
 use convert_case::{Case, Casing};
 use itertools::{Either, Itertools};
 use quote::format_ident;
-use syn::{parse_quote, FnArg, Ident, PatType, Signature, Type, Variant};
+use syn::{FnArg, Ident, PatType, Signature, Type, Variant, parse_quote};
 
 use crate::macros::{fallible_quote, filter_unwrap};
 

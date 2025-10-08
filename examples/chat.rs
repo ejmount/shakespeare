@@ -3,12 +3,12 @@
 //! Inputs are lines of UTF-8 text, which must end in `\n` specifically as per [`LinesCodec`]
 use std::any::Any;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
-use shakespeare::{actor, ActorOutcome, ActorSpawn, Context, Message, MessageStream};
+use shakespeare::{ActorOutcome, ActorSpawn, Context, Message, MessageStream, actor};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::wrappers::TcpListenerStream;
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};

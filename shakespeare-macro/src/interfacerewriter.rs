@@ -1,5 +1,5 @@
 use syn::fold::Fold;
-use syn::{parse_quote, Block, Receiver, ReturnType};
+use syn::{Block, Receiver, ReturnType, parse_quote};
 
 use crate::data::{RoleName, SignatureExt};
 

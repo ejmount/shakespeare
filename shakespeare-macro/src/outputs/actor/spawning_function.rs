@@ -1,6 +1,6 @@
-use itertools::{izip, Itertools};
+use itertools::{Itertools, izip};
 use proc_macro2::TokenStream;
-use quote::{format_ident, ToTokens};
+use quote::{ToTokens, format_ident};
 use syn::parse::Parser;
 use syn::{Expr, Field, Ident, ItemImpl, Result, Stmt};
 

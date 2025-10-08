@@ -2,7 +2,7 @@ use std::any::Any;
 use std::mem::drop;
 use std::time::Duration;
 
-use shakespeare::{actor, ActorOutcome, ActorSpawn, Context, Message};
+use shakespeare::{ActorOutcome, ActorSpawn, Context, Message, actor};
 use tokio::time::sleep;
 
 type Panic = Box<dyn Any + Send>;

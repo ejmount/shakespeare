@@ -11,11 +11,7 @@ mod Actor {
 		}
 
 		fn speak(&self, val: usize) -> usize {
-			if self.active {
-				2 * val
-			} else {
-				0
-			}
+			if self.active { 2 * val } else { 0 }
 		}
 	}
 }

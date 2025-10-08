@@ -1,6 +1,6 @@
 use convert_case::{Case, Casing};
 use proc_macro2::Ident;
-use quote::{format_ident, ToTokens};
+use quote::{ToTokens, format_ident};
 use syn::{Path, PathSegment};
 
 use super::MethodName;

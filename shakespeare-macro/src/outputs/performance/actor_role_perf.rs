@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use quote::ToTokens;
-use syn::{parse_quote, FnArg, ItemImpl, Path, Result, ReturnType, Signature};
+use syn::{FnArg, ItemImpl, Path, Result, ReturnType, Signature, parse_quote};
 
 use crate::data::{ActorName, FunctionItem, RoleName, SignatureExt};
 use crate::macros::{fallible_quote, filter_unwrap, map_or_bail};
