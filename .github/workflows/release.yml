@@ -24,6 +24,7 @@ jobs:
               with:
                 exclude: xtask
 
+
             - name: Get release tag
               id: release-tag
               # Using shell: bash explicitly because it turns on safety features like pipefail
@@ -31,12 +32,39 @@ jobs:
               run: |
                 echo "tag=v$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "shakespeare").version')" >> "$GITHUB_OUTPUT"
 
-            - name: Release
-              uses: softprops/action-gh-release@v2
-              with:
-                name: ${{ steps.release-tag.outputs.tag }}
-                draft: ${{ inputs.dry-run }}
-                prerelease: ${{ inputs.dry-run }}
+            - name: Check for pre-existing release
+              id: safety
+              env:
+                tag: ${{ steps.release-tag.outputs.tag }}
+                GH_TOKEN: ${{ github.token }}
+              shell: bash
+              run: |
+                if gh release view ${{ env.tag }} >/dev/null 2>&1; then
+                  echo "check=false" >> "$GITHUB_OUTPUT"
+                else
+                  echo "check=true" >> "$GITHUB_OUTPUT"
+                fi
+
+            - name: Create the release & upload assets
+              if: steps.safety.outputs.check == 'true'
+              env:
+                tag: ${{ steps.release-tag.outputs.tag }}
+                GH_TOKEN: ${{ github.token }}
+              shell: bash
+              run: |
+                shopt -s nullglob
+
+                rm -r semver-checks
+                zip -r shakespeare-${{ env.tag }}.zip *
+
+                gh release create \
+                    '${{ env.tag }}' \
+                    --draft \
+                    --prerelease='${{ inputs.dry-run }}' \
+                    --title '${{ env.tag }}'\
+                    --target='${{ github.ref_name }}' \
+                    shakespeare-${{ env.tag }}.zip
+
 
             - name: Publish to Crates.io
               uses: katyo/publish-crates@v2
