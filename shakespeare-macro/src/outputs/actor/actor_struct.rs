@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::parse::Parser;
 use syn::{Field, ImplItem, ItemImpl, ItemStruct, Result, Visibility};
 
@@ -124,8 +124,11 @@ fn shell_field_from_performance(perf: &PerformanceDecl) -> Result<Field> {
 	Field::parse_named
 		.parse2(quote! {#[doc(hidden)]  #field_name : shakespeare::Role2Sender<dyn #role_name> })
 		.map_err(|err| {
-			syn::parse::Error::new(err.span(),
-				format!("Parse failure trying to create actor field: {err} - this is a bug, please file an issue")
+			syn::parse::Error::new(
+				err.span(),
+				format!(
+					"Parse failure trying to create actor field: {err} - this is a bug, please file an issue"
+				),
 			)
 		})
 }

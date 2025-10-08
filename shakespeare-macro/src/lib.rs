@@ -28,7 +28,7 @@ use outputs::{ActorOutput, PerfDispatch, RoleOutput};
 use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::parse::Parse;
-use syn::{parse_quote, ItemImpl, ItemMod, ItemTrait, Result, TraitItem, Type};
+use syn::{ItemImpl, ItemMod, ItemTrait, Result, TraitItem, Type, parse_quote};
 use visibility as _;
 
 // The following three functions exist as entry points to the macros that can be called outside of a proc-macro context.

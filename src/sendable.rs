@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use futures::{pin_mut, Stream, StreamExt};
+use futures::{Stream, StreamExt, pin_mut};
 
 use crate::{Accepts, ReturnEnvelope, ReturnPath};
 

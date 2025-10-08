@@ -1,8 +1,8 @@
 use anyhow::Error;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::visit_mut::VisitMut;
-use syn::{parse_file, AttrStyle, Attribute, Item, ItemMod, Meta, MetaList};
+use syn::{AttrStyle, Attribute, Item, ItemMod, Meta, MetaList, parse_file};
 
 use crate::stripped_macro::{make_actor, make_performance, make_role};
 

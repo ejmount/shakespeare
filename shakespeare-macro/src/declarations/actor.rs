@@ -75,7 +75,7 @@ impl ActorDecl {
 				return Err(Error::new(
 					module_span,
 					"Actor declaration must contain one struct, enum or union",
-				))
+				));
 			}
 			Err(extras) => {
 				let errors = extras.map(|d| {
