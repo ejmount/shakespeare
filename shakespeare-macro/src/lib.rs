@@ -108,14 +108,14 @@ fn parse_macro_input<T: Parse>(
 /// Other items, including inherent `impl S` blocks, will be passed through unmodified into the surrounding module.
 ///
 /// The macro then generates a new type with the same name as the module. This new type:
-/// 1. has a constructor function `start(state: S) -> ActorSpawn<Self>`. (This function is currently *always* private to the parent module containg the `#[actor]` block - write a wrapper for now if you want to access it from outside)
+/// 1. has a constructor function `start(state: S) -> ActorHandles<Self>`. (This function is currently *always* private to the parent module containg the `#[actor]` block - for now, you will need to write a wrapper to access it from a wider scope)
 /// 2. implements each role trait for which it has a performance.
 ///
-/// The `ActorSpawn` contains an `Arc` that refers to the actor object. This value is the interface for sending the actor messages and controls its lifetime. When the last `Arc` goes out of scope, the actor will finish processing any messages it has already received, call its `stop` function if one exists, and then drop its state. If a method handler inside a performance panics, the `catch` function will be called *instead of* `stop`.
+/// The `ActorHandles` contains an `Arc` that refers to the actor object. This value is the interface for sending the actor messages and controls its lifetime. When the last `Arc` goes out of scope, the actor will finish processing any messages it has already received, call its `stop` function if one exists, and then drop its state. If a method handler inside a performance panics, the `catch` function will be called *instead of* `stop`.
 ///
 /// The actor `Arc` can be upcast to a `Arc<dyn MyRole>` (for an actor with a performance of `MyRole`) to allow for code that works generically over a given role.
 ///
-/// The `ActorSpawn` also contains a `Handle`, which is a future that will yield the value produced by the actor stopping, either successfully or by panic.
+/// The `ActorHandles` also contains a `ExitHandle`, which is a future that will yield the value produced by the actor stopping, either successfully or by panic.
 #[proc_macro_attribute]
 pub fn actor(attr: TokenStream, item: TokenStream) -> TokenStream {
 	actor_internal(attr.into(), item.into()).into()

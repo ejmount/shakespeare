@@ -34,9 +34,9 @@ pub trait Channel {
 	fn new(init: Self::Input) -> (Self::Sender, Self::Receiver);
 }
 
-/// A Role that an Actor can implement.
+/// A supertrait for Roles that an actor might implement
 ///
-/// Roles implement this trait, which describes the generic features all roles contain. See the [`super::super::role`] macro for more information.
+/// Roles (that is, the dyn type, `dyn ARole`) implement this trait, which describes the generic features all roles contain. See the [`role`](`super::super::role`) macro for more information.
 /// No internal details of this trait are relevant to external users, only whether it is implemented and its related implementations of [`Accepts`] and [`Emits`]
 #[trait_variant::make(Send)]
 // This logically *should* be 'static but the compiler can't deal with the lifetime bounds properly. See https://github.com/rust-lang/rust/issues/131488
@@ -54,14 +54,16 @@ pub trait Role: Sync + Send {
 	async fn enqueue(&self, val: ReturnEnvelope<Self>) -> Result<(), Role2SendError<Self>>;
 }
 
-/// This Role can be sent `T` values
+/// Denotes that a Role can be sent `T` values
 ///
-/// A Role (specifically, the type, `dyn Role`) implementing this trait means that exactly one method of the Role has a parameter list corresponding to `T`. This means the actor can determine what method call is intended from the value alone, and so can implement [`crate::Message::send_to`] and similar. Methods explicitly defined in the Role can be called whether or not an `Accepts` implementation exists.
+/// A Role (specifically, the type, `dyn Role`) implementing this trait means that exactly one method of the Role has a parameter list corresponding to `T`. This means the actor can determine what method call is intended from the value alone, and so can work with [`crate::Message::send_to`] and similar. Methods explicitly defined in the Role can be called whether or not an `Accepts` implementation exists.
 ///
 /// Because a single actor can implement multiple roles, and each role may have an implementation of this trait for the same value of `T`, you may need to disambiguate the call like so:
 /// ```ignore
 /// future.send_to(actor as Arc<dyn Role>)
 /// ```
+///
+/// (This trait's implementations are normally automatically generated)
 pub trait Accepts<T>: Role {
 	#[doc(hidden)]
 	fn into_payload(t: T) -> Self::Payload;
@@ -75,9 +77,11 @@ impl<R: Role + ?Sized> Accepts<R::Payload> for R {
 	}
 }
 
-/// At least one method of this Role produces a `T`
+/// Denotes that at least one method of a Role produces a `T`
 ///
-/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. This is primarily required to allow [`crate::Envelope`] to return the proper return type, but also underpins [`crate::Envelope::forward_to`].
+/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. The primary use for this is to express bounds for the [`crate::Envelope::forward_to`] method.
+///
+/// (This trait's implementations are normally automatically generated)
 pub trait Emits<T>: Role {
 	#[doc(hidden)]
 	fn from_return_payload(t: Self::Return) -> T;

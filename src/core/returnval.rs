@@ -15,10 +15,13 @@ type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
 
 #[doc(hidden)]
 #[derive(Default)]
+// Represents what to do with the return value from a performance handler
 pub enum ReturnPath<Payload: Send> {
 	#[default]
 	Discard,
+	// Send it onwards to another actor's mailbox by runnin a function
 	Mailbox(Box<dyn Send + FnOnce(Payload) -> PinnedAction>),
+	// Send it directly back to the caller via the given sender
 	Immediate(Sender<Payload>),
 }
 
@@ -69,6 +72,7 @@ where
 {
 	val:  Option<DestRole::Payload>,
 	dest: Option<Arc<DestRole>>,
+	// "Type parameter Output is never used"
 	_v:   PhantomData<Output>,
 }
 
