@@ -24,6 +24,11 @@ jobs:
               with:
                 exclude: xtask
 
+            - name: Checkout sources
+              uses: actions/checkout@v2
+              with:
+                submodules: true
+                clean: true
 
             - name: Get release tag
               id: release-tag
@@ -54,16 +59,17 @@ jobs:
               run: |
                 shopt -s nullglob
 
-                rm -r semver-checks
                 zip -r shakespeare-${{ env.tag }}.zip *
 
                 gh release create \
                     '${{ env.tag }}' \
-                    --draft \
+                    --draft='${{ inputs.dry-run }}' \
                     --prerelease='${{ inputs.dry-run }}' \
                     --title '${{ env.tag }}'\
                     --target='${{ github.ref_name }}' \
                     shakespeare-${{ env.tag }}.zip
+
+                rm shakespeare-${{ env.tag }}.zip
 
 
             - name: Publish to Crates.io
@@ -71,3 +77,4 @@ jobs:
               with:
                 dry-run: ${{ inputs.dry-run }}
                 registry-token: ${{ secrets.CRATESIO_TOKEN }}
+                ignore-unpublished-changes: true
