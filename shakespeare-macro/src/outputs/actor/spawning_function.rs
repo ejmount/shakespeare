@@ -61,7 +61,7 @@ impl SpawningFunction {
 			izip!(performances, &output_field_names),
 			|(perf, output)| -> Result<TokenStream> {
 				let fn_name = perf.role_name.method_name();
-				fallible_quote! { Some(msg) = #output.recv(), if !(#output.is_empty() && !context.sustains()) => {
+				fallible_quote! { Some(msg) = #output.recv(), if !(#output.is_empty()) || context.is_running() => {
 					timeout_sleep.as_mut().reset(Instant::now() + IDLE_TIMEOUT);
 					state.#fn_name(&mut context, msg).await
 				} }
@@ -87,8 +87,8 @@ impl SpawningFunction {
 		let fun: ItemImpl = fallible_quote! {
 			impl #actor_name {
 				/// Creates a new Actor
-				fn start(mut state: #data_name) -> shakespeare::ActorSpawn<#actor_name> {
-					use ::shakespeare::{ActorSpawn, Channel, Context, catch_future, tokio_export as tokio};
+				fn start(mut state: #data_name) -> shakespeare::ActorHandles<#actor_name> {
+					use ::shakespeare::{ActorHandles, Channel, Context, catch_future, tokio_export as tokio};
 					use ::std::sync::Arc;
 					use tokio::{select, pin};
 					use tokio::time::{sleep, Duration, Instant};
@@ -108,8 +108,9 @@ impl SpawningFunction {
 							loop {
 								select! {
 									#(#select_branches),*
-									_ = &mut timeout_sleep, if context.sustains() => {
-										if !context.sustains() {
+									_ = &mut timeout_sleep, if context.is_running() => {
+										// Check is_running so that if it is false at the point we check, the whole loop breaks even without checking the timer
+										if !context.is_running() {
 											break;
 										}
 										else {
@@ -142,7 +143,7 @@ impl SpawningFunction {
 					};
 
 					let join_handle = tokio::task::spawn(event_loop);
-					ActorSpawn::new(actor, join_handle)
+					ActorHandles::new(actor, join_handle)
 				}
 			}
 		}?;

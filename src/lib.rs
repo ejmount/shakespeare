@@ -154,8 +154,8 @@ mod sendable;
 mod tokio;
 
 pub use core::{
-	Accepts, Context, Emits, Envelope, Handle as ActorHandle, Outcome as ActorOutcome, Role,
-	Shell as ActorShell, Spawn as ActorSpawn, State as ActorState,
+	Accepts, ActorHandles, Context, Emits, Envelope, ExitHandle, Outcome as ActorOutcome, Role,
+	Shell as ActorShell, State as ActorState,
 };
 #[doc(hidden)]
 pub use core::{

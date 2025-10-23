@@ -54,21 +54,21 @@ where
 ///
 /// Serves the same role as [`std::thread::JoinHandle`], but for an actor. Can be awaited to receive the actor's output value.
 /// As with `JoinHandle`, dropping this value without awaiting it detaches the actor task and makes any output value from the actor inaccessible.
-pub struct Handle<A: Shell>(JoinHandle<Result<A::ExitType, A::PanicType>>);
+pub struct ExitHandle<A: Shell>(JoinHandle<Result<A::ExitType, A::PanicType>>);
 
-impl<A: Shell> Handle<A> {
-	fn new(val: JoinHandle<Result<A::ExitType, A::PanicType>>) -> Handle<A> {
-		Handle(val)
+impl<A: Shell> ExitHandle<A> {
+	fn new(val: JoinHandle<Result<A::ExitType, A::PanicType>>) -> ExitHandle<A> {
+		ExitHandle(val)
 	}
 }
 
-impl<A: Shell> Debug for Handle<A> {
+impl<A: Shell> Debug for ExitHandle<A> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_str("ActorHandle")
 	}
 }
 
-impl<A: Shell> Future for Handle<A> {
+impl<A: Shell> Future for ExitHandle<A> {
 	type Output = Outcome<A>;
 
 	fn poll(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -109,22 +109,25 @@ pub trait State {
 /// The `Handle<A>` is a future that enables awaiting on the actor's completion and retrieving its output value, either as a result of the last `Arc<A>` dropping or theh actor's message handlers panicking. However, if you do not need this value, the `Handle` can be discarded and the actor will continue running.
 #[non_exhaustive]
 #[derive(Debug)]
-pub struct Spawn<A>
+pub struct ActorHandles<A>
 where
 	A: Shell,
 {
 	/// A handle for sending messages to the actor
-	pub actor_handle: Arc<A>,
+	pub message_handle: Arc<A>,
 	/// A future for awaiting the actor's completion
-	pub join_handle:  Handle<A>,
+	pub join_handle:    ExitHandle<A>,
 }
 
-impl<A: Shell> Spawn<A> {
+impl<A: Shell> ActorHandles<A> {
 	#[doc(hidden)]
-	pub fn new(actor: Arc<A>, handle: JoinHandle<Result<A::ExitType, A::PanicType>>) -> Spawn<A> {
-		Spawn {
-			actor_handle: actor,
-			join_handle:  Handle::new(handle),
+	pub fn new(
+		actor: Arc<A>,
+		handle: JoinHandle<Result<A::ExitType, A::PanicType>>,
+	) -> ActorHandles<A> {
+		ActorHandles {
+			message_handle: actor,
+			join_handle:    ExitHandle::new(handle),
 		}
 	}
 }

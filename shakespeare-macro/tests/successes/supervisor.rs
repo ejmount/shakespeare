@@ -2,7 +2,7 @@ use std::any::Any;
 use std::mem::drop;
 use std::time::Duration;
 
-use shakespeare::{ActorOutcome, ActorSpawn, Context, Message, actor};
+use shakespeare::{ActorHandles, ActorOutcome, Context, Message, actor};
 use tokio::time::sleep;
 
 type Panic = Box<dyn Any + Send>;
@@ -21,8 +21,8 @@ pub mod Supervisor {
 	#[performance(canonical)]
 	impl Starter for SupervisorState {
 		async fn go(&mut self, ctx: &'_ mut Context<Self>) {
-			let ActorSpawn {
-				actor_handle,
+			let ActorHandles {
+				message_handle,
 				join_handle,
 				..
 			} = Worker::start(WorkerState {
@@ -30,10 +30,10 @@ pub mod Supervisor {
 				count:   0,
 			});
 			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
-			actor_handle.work().await.unwrap();
+			message_handle.work().await.unwrap();
 
-			let ActorSpawn {
-				actor_handle,
+			let ActorHandles {
+				message_handle,
 				join_handle,
 				..
 			} = Worker::start(WorkerState {
@@ -41,10 +41,10 @@ pub mod Supervisor {
 				count:   0,
 			});
 			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
-			actor_handle.work().await.unwrap();
+			message_handle.work().await.unwrap();
 
-			let ActorSpawn {
-				actor_handle,
+			let ActorHandles {
+				message_handle,
 				join_handle,
 				..
 			} = Worker::start(WorkerState {
@@ -54,7 +54,7 @@ pub mod Supervisor {
 			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
 
 			sleep(Duration::from_millis(500)).await;
-			drop(actor_handle);
+			drop(message_handle);
 		}
 	}
 
@@ -111,14 +111,14 @@ pub mod Worker {
 
 #[tokio::test]
 async fn main() {
-	let ActorSpawn {
-		actor_handle,
+	let ActorHandles {
+		message_handle,
 		join_handle,
 		..
 	} = Supervisor::start(SupervisorState::default());
 
-	let _ = actor_handle.go().await;
-	drop(actor_handle);
+	let _ = message_handle.go().await;
+	drop(message_handle);
 
 	assert_eq!(join_handle.await, ActorOutcome::Exit(true));
 }

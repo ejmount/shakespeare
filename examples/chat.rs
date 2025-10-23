@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
-use shakespeare::{ActorOutcome, ActorSpawn, Context, Message, MessageStream, actor};
+use shakespeare::{ActorHandles, ActorOutcome, Context, Message, MessageStream, actor};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::wrappers::TcpListenerStream;
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
@@ -46,8 +46,8 @@ pub mod Client {
 			let framed = Framed::new(client, LinesCodec::new());
 			let (out_stream, in_stream) = framed.split();
 
-			let ActorSpawn {
-				actor_handle,
+			let ActorHandles {
+				message_handle,
 				join_handle,
 				..
 			} = Client::start(UserState {
@@ -55,10 +55,10 @@ pub mod Client {
 				relay: relay.clone(),
 				out_stream,
 			});
-			in_stream.send_to(actor_handle.clone() as Arc<dyn NetClient>);
+			in_stream.send_to(message_handle.clone() as Arc<dyn NetClient>);
 			join_handle.send_to(relay);
 
-			actor_handle
+			message_handle
 		}
 	}
 
@@ -164,13 +164,13 @@ async fn main() {
 	// Get the client stream from the Listener. Fine to drop anything that causes an IO failure.
 	let client_stream = TcpListenerStream::new(listener).filter_map(|r| async { r.ok() });
 
-	let ActorSpawn {
-		actor_handle,
+	let ActorHandles {
+		message_handle,
 		join_handle,
 		..
 	} = Server::start(ServerState::default());
 
-	client_stream.send_to(actor_handle as Arc<dyn NetListener>);
+	client_stream.send_to(message_handle as Arc<dyn NetListener>);
 
 	join_handle.await;
 }

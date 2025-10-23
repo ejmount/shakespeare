@@ -26,9 +26,8 @@ impl<A: State + ?Sized> Context<A> {
 
 	#[doc(hidden)]
 	/// Whether the message queue should still be held open
-	/// TODO: Find a better name
 	#[must_use]
-	pub fn sustains(&self) -> bool {
+	pub fn is_running(&self) -> bool {
 		Arc::strong_count(&self.shell_handle) > 1 && self.running
 	}
 

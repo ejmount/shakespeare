@@ -77,7 +77,7 @@ async fn main() {
     let (tx, mut rx) = mpsc::channel(1);
 
     let actor_state = StateA(tx);
-    let actor: Arc<dyn BasicRole> = AnActor::start(actor_state).actor_handle; // Actors can be upcast to a Role trait object
+    let actor: Arc<dyn BasicRole> = AnActor::start(actor_state).message_handle; // Actors can be upcast to a Role trait object
 
     {
         let _ = actor.inform(100);

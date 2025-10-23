@@ -1,7 +1,7 @@
 use std::any::Any;
 
-use shakespeare::ActorSpawn;
-use tokio::sync::mpsc::UnboundedSender;
+use shakespeare::ActorHandles;
+use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 
 #[shakespeare::actor]
 mod Actor {
@@ -17,7 +17,6 @@ mod Actor {
 	}
 
 	fn stop(self) {
-		println!("Exiting");
 		let _ = self.sender.send(0);
 	}
 
@@ -28,12 +27,12 @@ mod Actor {
 
 #[tokio::test]
 async fn main() {
-	let (sender, mut recv) = tokio::sync::mpsc::unbounded_channel();
+	let (sender, mut recv) = unbounded_channel();
 	let olaf = ActorState { sender };
-	let ActorSpawn { actor_handle, .. } = Actor::start(olaf);
-	let envelope = actor_handle.speak(40);
+	let ActorHandles { message_handle, .. } = Actor::start(olaf);
+	let envelope = message_handle.speak(40);
 	envelope.await.unwrap();
 	assert_eq!(recv.recv().await.unwrap(), 40);
-	drop(actor_handle);
+	drop(message_handle);
 	assert_eq!(recv.recv().await.unwrap(), 0);
 }

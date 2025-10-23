@@ -18,9 +18,10 @@ mod Actor {
 
 #[tokio::test]
 async fn main() {
-	let shakespeare::ActorSpawn { actor_handle, .. } = Actor::start(ActorState { active: false });
+	let shakespeare::ActorHandles { message_handle, .. } =
+		Actor::start(ActorState { active: false });
 
-	let actor: std::sync::Arc<dyn BasicRole> = actor_handle;
+	let actor: std::sync::Arc<dyn BasicRole> = message_handle;
 
 	let inactive = actor.speak(40).await.unwrap();
 	assert_eq!(inactive, 0);
