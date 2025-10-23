@@ -65,7 +65,7 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 #[derive(Debug)]
 pub struct Envelope<DestRole, Output>
 where
-	DestRole: Emits<Output> + ?Sized + 'static,
+	DestRole: Role + ?Sized + 'static,
 {
 	val:  Option<DestRole::Payload>,
 	dest: Option<Arc<DestRole>>,
@@ -74,13 +74,10 @@ where
 
 impl<DestRole, Output> Envelope<DestRole, Output>
 where
-	DestRole: Emits<Output> + ?Sized,
+	DestRole: Role + ?Sized,
 {
 	#[doc(hidden)]
-	pub fn new<Input>(val: Input, dest: Arc<DestRole>) -> Envelope<DestRole, Output>
-	where
-		DestRole: Accepts<Input>,
-	{
+	pub fn new(val: DestRole::Payload, dest: Arc<DestRole>) -> Envelope<DestRole, Output> {
 		Envelope {
 			val:  Some(DestRole::into_payload(val)),
 			dest: Some(dest),
@@ -128,6 +125,7 @@ where
 		recipient: Arc<RxRole>,
 	) -> Result<(), Role2SendError<DestRole>>
 	where
+		DestRole: Emits<Output>,
 		RxRole: Accepts<Output> + 'static,
 	{
 		let (payload, original) = self.unpack();
@@ -183,7 +181,7 @@ where
 
 impl<DestRole, Output> Drop for Envelope<DestRole, Output>
 where
-	DestRole: Emits<Output> + ?Sized,
+	DestRole: Role + ?Sized,
 {
 	fn drop(&mut self) {
 		let val = self.val.take().unwrap();
