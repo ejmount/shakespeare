@@ -101,10 +101,8 @@ where
 	///
 	/// This function may return `Err` if the actor has already stopped.
 	#[must_use = "The message will not be sent to the actor if this Future isn't processed"]
-	#[expect(clippy::missing_panics_doc)] // This is complaining about the `take`, but that should only be None if this has dropped
-	pub async fn ignore(mut self) -> Result<(), Role2SendError<DestRole>> {
-		let payload = self.val.take().unwrap();
-		let dest = self.dest.take().unwrap();
+	pub async fn ignore(self) -> Result<(), Role2SendError<DestRole>> {
+		let (payload, dest) = self.unpack();
 
 		let return_path = ReturnPath::Discard;
 
