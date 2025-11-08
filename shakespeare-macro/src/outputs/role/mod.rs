@@ -49,11 +49,11 @@ impl RoleOutput {
 		}?;
 
 		let role_impl = fallible_quote! {
-			impl ::shakespeare::Role for dyn #role_name + '_
+			impl<'a> ::shakespeare::Role for dyn #role_name + 'a
 			{
 				type Payload = #payload_type;
 				type Return = #return_payload_type;
-				type Channel = ::shakespeare::TokioUnbounded<::shakespeare::ReturnEnvelope<dyn #role_name>>;
+				type Channel = ::shakespeare::TokioUnbounded<::shakespeare::ReturnEnvelope<Self>>;
 				async fn enqueue(&self, val: ::shakespeare::ReturnEnvelope<Self>) -> Result<(), ::shakespeare::Role2SendError<Self>> {
 					self.enqueue(val).await
 				}
