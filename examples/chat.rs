@@ -136,7 +136,6 @@ pub mod Server {
 				ActorOutcome::Exit(client_id) | ActorOutcome::Panic(client_id) => {
 					self.remove_client(client_id).await;
 				}
-				_ => unimplemented!(),
 			}
 		}
 	}

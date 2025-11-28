@@ -5,13 +5,8 @@ use std::task::{Context, Poll};
 use futures::Future;
 use tokio::task::JoinHandle;
 
-#[non_exhaustive]
 /// Indicates whether an actor closed down successfully and any output value produced
 pub enum Outcome<A: Shell> {
-	#[doc(hidden)]
-	/// The actor was explicitly aborted at the task level.
-	/// It shouldn't be possible to encounter this is in practice,
-	Aborted(tokio::task::JoinError),
 	/// The actor exited successfully either as all of its strong references dropped or by explicit shutdown.
 	Exit(A::ExitType),
 	/// The actor panicked executing one of its message handlers.
@@ -21,7 +16,6 @@ pub enum Outcome<A: Shell> {
 impl<A: Shell> Debug for Outcome<A> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Outcome::Aborted(_) => f.write_str("ActorOutcome::Aborted"),
 			Outcome::Exit(_) => f.write_str("ActorOutcome::Exit"),
 			Outcome::Panic(_) => f.write_str("ActorOutcome::Panic"),
 		}
@@ -79,7 +73,10 @@ impl<A: Shell> Future for ExitHandle<A> {
 			Poll::Ready(result) => match result {
 				Ok(Ok(e)) => Outcome::Exit(e),
 				Ok(Err(f)) => Outcome::Panic(f),
-				Err(e) => Outcome::Aborted(e),
+				Err(e) => unreachable!(
+					"Task for actor {} aborted with error {e} - this is a bug",
+					std::any::type_name::<A>()
+				),
 			}
 			.into(),
 		}

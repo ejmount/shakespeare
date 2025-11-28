@@ -30,7 +30,11 @@ pub mod Supervisor {
 				count:   0,
 			});
 			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
-			message_handle.work().await.unwrap();
+			message_handle
+				.work()
+				.ignore()
+				.await
+				.expect("Message send shouldn't fail at this stage");
 
 			let ActorHandles {
 				message_handle,
@@ -65,7 +69,6 @@ pub mod Supervisor {
 				ActorOutcome::Exit(true) => self.success = true,
 				ActorOutcome::Exit(false) => self.idle = true,
 				ActorOutcome::Panic(_) => self.failure = true,
-				_ => unimplemented!(),
 			}
 		}
 	}
