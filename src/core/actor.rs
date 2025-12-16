@@ -47,7 +47,9 @@ where
 /// A handle for the actor's exit value.
 ///
 /// Serves the same role as [`std::thread::JoinHandle`], but for an actor. Can be awaited to receive the actor's output value.
-/// As with `JoinHandle`, dropping this value without awaiting it detaches the actor task and makes any output value from the actor inaccessible.
+/// As with `JoinHandle`, dropping this value without awaiting it detaches the actor task and makes any output value from the actor inaccessible, but does **not** shut down the actor's processing.
+///
+/// The exact types contained in the [`Outcome`] returned by the handle depends on whether the actor defines `stop` and/or a `catch` hook functions. (See the [actor macro](`crate::actor`) documentation.) If `stop` is defined, the `Exit` branch contains the same type as that function returns; if that function is not defined, it contains `()`. The same applies for `catch` and the `Panic` branch, except that if `catch` is not defined, the type is instead `Box<dyn std::any::Any + Send>`.
 pub struct ExitHandle<A: Shell>(JoinHandle<Result<A::ExitType, A::PanicType>>);
 
 impl<A: Shell> ExitHandle<A> {
@@ -58,7 +60,7 @@ impl<A: Shell> ExitHandle<A> {
 
 impl<A: Shell> Debug for ExitHandle<A> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str("ActorHandle")
+		f.write_str("ExitHandle")
 	}
 }
 

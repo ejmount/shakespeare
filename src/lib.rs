@@ -7,7 +7,7 @@
 //! * [Actors](`shakespeare_macro::actor`) - objects that can asynchronously receive messages and run user-defined code in response. Actors contain state of an arbitrary type; message handlers can be arbitrary code, although will most commonly include updating their state, sending new messages and/or spawning additional actors.
 //!    * Some parts of this documentation refer specifically to the "actor shell", which is the automatically generated proxy object that handles the message passing into and out of the code you have written defining the actor's methods and state.
 //!    * There is no "world" or "system" boundary in Shakespeare - any part of your program can call methods on any actor for which it has a handle, and any part can spawn new actors.
-//! * [Roles](`shakespeare_macro::role`) - traits for actors. A Role defines a set of methods that can be asynchronously called on an actor and which may be asynchronous themselves. These methods return a [`Envelope`] which is a `Future` of a return value, if any - the caller can use the envelope object to decide whether (and how) to await for any return value that the method may produce.
+//! * [Roles](`shakespeare_macro::role`) - traits for actors. A Role defines a set of methods that can be asynchronously called on an actor and which may be asynchronous themselves. These methods return a [`Envelope`] to external callers, which is a `Future` of a return value, if any - the caller can use the envelope object to decide whether (and how) to await for any return value that the method may produce.
 //! * [Performances](`shakespeare_macro::performance`) - the block of code that actually defines how a given actor implements a role. This is in most ways a normal trait implementation, with the macro generating all of the glue code needed to call the defined methods as part of the actor's message loop.
 //!
 //! ## Using actors
@@ -16,35 +16,35 @@
 //!
 //! The `start` function returns a [`ActorHandles`], which contains two values:
 //! * an [`ExitHandle`] - this is a [`Future`][`std::future::Future`] that yields when the actor exits, the value of which indicates whether the actor exited gracefully (all handles were dropped or a handler explicitly shut it down) or by one of the message handlers panicking. Dropping this value doesn't affect the actor's execution
-//! * the `message_handle` - an [`Arc`][`std::sync::Arc`] containing the shell type, the first handle to the new actor. If all `Arcs` of the actor drop, the actor begins shutting down.
+//! * the `message_handle` - an [`Arc`][`std::sync::Arc`] containing the shell type, the first handle to the new actor. If all copies of this value drop, the actor begins shutting down.
 //!
-//! At this point, the actor is active as a separate task, and will process any messages sent to its mailbox by calling the appropriate method from the corresponding performance definition.
+//! At this point, the actor is active as a new task, separate from the one that called `start`. Calling a method on the shell type via the `message_handle` will send a message to the actor's mailbox containing the method's parameter values. The actor will then service this message by calling the corresponding method from the matching `performance` block. (This can be seen as the asynchronous version of calling a trait method on an trait object - the lookup is handled automatically.) If the method returns a value, this return value will be passed back to the caller automatically as described below.
 //!
-//! To send the actor a message, methods defined by the actor's roles can be called on the shell as normal, except that where the role defines a method with signature `... -> T` the call on the shell type instead returns [`Envelope<T>`]. For full details, see that type's documentation, but in most cases, you will want to do one of two things with it:
-//! * `await` it - an `Envelope` implements [`IntoFuture`][`std::future::IntoFuture`] and will yield a value of `Ok(T)` assuming there are no problems with data transfer to the actor.
-//! * allow it to drop, which will dispatch the message to the destination actor's mailbox but not wait for any return value.
+//! Where a role defines a method that returns a value of type `T`, the call on the shell type instead returns [`Envelope<T>`], which is then used to access the return value the actor produced. For full details, see that type's documentation, but in most cases, you will want to do one of two things with it:
+//! * `await` it - an `Envelope` implements [`IntoFuture`][`std::future::IntoFuture`] and will yield a value of `Ok(T)` containing the return value, unless the actor that produced the `Envelope` shut down before processing the message.
+//! * allow it to drop, which will dispatch the message to the destination actor's mailbox but not wait for any return value. This option does not allow checking for failure.
 //!
-//! Actors can also receive general [`Future`] and [`Stream`][`futures::Stream`] values to their mailboxes, using [`Message::send_to`] and [`MessageStream::send_to`]. The types these functions can work on are specified by what implementations of the [`Accepts`] trait the actor has, see that trait documentation for details.
+//! Actors can also receive general [`Future`] and [`Stream`][`futures::Stream`] values as messages, using [`Message::send_to`] and [`MessageStream::send_to`]. These functions work on roles that implement the [`Accepts`] trait, which is implemented for roles which have exactly one method that takes a given tuple of parameters. (And is implemented separately for each such tuple.)
 //!
 //! **Note**: The API is designed to allow code to work with dynamically typed actors of a given role by using values of type `Arc<dyn Role>`, which `Arc<A>` can be upcast to by normal language rules. This construction does mean that the compiler may need help to correctly disambiguate [`Message::send_to`] (and similar) calls.
 //!
 //!
 //! ## Defining an actor
 //!
-//! The starting point for defining a new actor is an `#[actor]` module block. The name of the actor shell type (from which `start` is called) is defined by the name of the module. As an example, to start the following, one would call `MyActor::start(SomeState)`:
+//! The starting point for defining a new actor is an `#[actor]` module block. The name of the actor shell type (from which `start` is called) is defined by the name of the module. As an example, to start the following, one would call `MyActor::start(MyState)`:
 //!
 //! ```ignore
 //! #[actor]
-//! mod MyActor {
-//! 	enum SomeState {
+//! mod MyActor { // <-- This name can be any valid type name
+//! 	enum MyState { // <-- This name can also be any valid type name
 //! 		Some(Data),
 //! 		Empty,
 //! 	}
-//! 	// ...
+//! 	// ...other items...
 //! }
 //! ```
 //!
-//! The module needs to contain exactly one `struct`, `enum` *or* `union`, which serves as the state type of the actor. This type must be `'static`, `Sized`, and cannot contain free generic parameters (`enum SomeState<T>` would not be allowed) but there are no other restrictions on its content. It does not move after the actor is started, so storing large amounts of data inline is not a performance concern.
+//! The module can be named anything. It needs to contain exactly one `struct`, `enum` *or* `union`, which serves as the state type of the actor. This type can similarly have any name that does not collide with the module name, but must be `'static`, `Sized`, and cannot contain free generic parameters (`enum MyState<T>` would not be allowed) but there are no other restrictions on its content. It does not move after the actor is started, so storing large amounts of data inline is not a performance concern.
 //!
 //! ### Performances
 //!
@@ -52,43 +52,46 @@
 //!
 //! ```ignore
 //! #[performance]
-//! impl ARole for MyActor {
+//! impl ARole for MyState { // <-- this name should match the name you used previously
 //!     async fn a_method(&mut self, ...) -> ... {
-//!         todo!()
+//!         // any code can go here
+//!         unimplemented!()
 //!     }
+//!     // Any number of other methods
 //! }
 //! ```
 //!
-//! While inherent `impl SomeState` blocks are allowed within the module, there is currently no support for calling these from outside the actor - all externally callable methods must be defined on a performance. (See `canonical` performances later for a simplification of the common case)
+//! While inherent `impl MyState` blocks are allowed within the module, there is currently no support for calling methods from such a block on the actor state from outside the actor, as the state value is not externally accessible - all externally callable methods must be defined on a performance. (See `canonical` performances later for a simplification of the common case) Conversely, free functions (i.e. with no `self`) defined inside such inherent `impl` blocks can be called as normal. Methods from such a block can be called on the state value from within a performance.
 //!
-//! For methods inside a performance block, `Self` refers to the state type. (e.g. `SomeState` above) The above is the "strongest" form of signature - method implementations that do not `await` anything or mutate the state object do not have to include the respective keywords.
+//! For methods inside a performance block, `Self` refers to the state type. (e.g. `MyState` above) The above is the "strongest" form of signature - method implementations that do not `await` anything can leave off the `await` keyword, and implementations that do not mutate the state object can take plain `&self`.
 //!
-//! **N.B.** While an actor's message handler can `await` futures (whether from an [`Envelope`] or otherwise) the event loop cannot resume until the method returns. This risks deadlocks where two actors end up awaiting replies from each other. If you need to handle the return value from calling another actor without blocking the original sender by waiting on it, consider using [`Message::send_to`] or [`MessageStream::send_to`] and passing the sender's handle.
+//! **N.B.** While an actor's message handler can `await` futures (whether from an [`Envelope`] or otherwise) the event loop cannot resume until the method returns. This risks deadlocks: if actor A sends and then awaits a message to actor B, and in response actor B sends and awaits a message to actor A, the two wil deadlock because A cannot service further messages (including the one B sent it) until it receives a response from  B, which is waiting on A. If you need to handle the return value from calling another actor (B) without blocking the original sender (A) by waiting on it, consider using [`Message::send_to`] or [`MessageStream::send_to`] and passing the sender's handle.
 //!
-//! A performance implementation is allowed to be outside of the actor `mod` scope, in the same way that any other `impl ... for` block can be anywhere within the crate, but if it is elsewhere, the `mod` must contain a `#[performance] impl ARole for MyActor {}` block, including empty braces. A more detailed description along with other caveats can be found in [the full macro documentation](shakespeare_macro::performance).
+//! A performance implementation is allowed to be outside of the actor `mod` scope, in the same way that any other `impl ... for` block can be outside the module that defines the struct, but if it is elsewhere, the actor `mod` must contain a `#[performance] impl ARole for MyActor {}` block, including empty braces. A more detailed description along with other caveats can be found in [the full macro documentation](shakespeare_macro::performance).
 //!
-//! Defining a role is syntatically a normal trait declaration with the appropriate macro attached:
+//! Defining a role is syntatically a normal trait declaration, just with the macro attached:
 //!
 //! ```ignore
 //! #[role]
 //! trait ARole {
 //!     fn a_method(&mut self, ...) -> ...;
+//!     // Any number of other methods
 //! }
 //! ```
 //!
-//! The methods on this trait should *not* be marked `async`, that is handled by the macro. Additionally, there are a number of restrictions on the trait's methods - see the [the macro documentation](shakespeare_macro::role) for the specifics.
+//! The methods on this trait should *not* be marked `async`, that is handled by the macro. While a role can have any number of methods, with any names and with any number of parameters, there are a number of restrictions on the types that can be used in the parameters and return values - see the [the macro documentation](shakespeare_macro::role) for the specifics.
 //!
-//! It's expected that many traits have a single "primary" implementation, such as an application object having a particular interface that testing mock implementations conform to. To simplify this situation, instead a role can be defined implicitly via a performance by providing:
+//! It's expected that many traits have a single "primary" implementation, such as an application object having a particular interface that testing mock implementations are then defined by. To simplify this situation, instead a role can be defined implicitly via a performance by providing:
 //! ```ignore
 //! #[performance(canonical)]
-//! impl ARole for MyActor {
+//! impl ARole for MyState {
 //!     ... // the trait ARole will be defined as part of generating the performance
 //! }
 //! ```
 //!
 //! ### Miscellenia
 //!
-//! A method inside a performance can define its *second* parameter (i.e. the one immediately after the `self`) as having a type of `&'_ mut Context<Self>` to get access to the [`Context`] object for the current actor, which includes the capability of getting the current actor's handle or shutting it down early.  The context parameter should *not* be included in any explicitly defined roles, and roles defined by `canonical` performances take this into account.
+//! A method inside a performance can define its *second* parameter (i.e. the one immediately after the `self`) as having a type of `&'_ mut Context<Self>` to get access to the [`Context`] object for the current actor, which includes the capability of getting the current actor's handle or shutting it down early. (If only a shared borrow is required, `&'_ Context<Self>` is also allowed.) The context parameter should *not* be included in any explicitly defined roles, and roles defined by `canonical` performances take this into account - it is used only inside performance definitions.
 //!
 //!
 //! ## Actor Lifetime
@@ -107,20 +110,24 @@
 //!
 //! Calling `Actor::start(state)` spawns a new task for handling the actor's event loop. It is expected that you do any setup needed for the actor to be in a ready state in the construction of the `state` value itself, and there is currently no interface for running user code after the actor is constructed but before the event loop proper begins. However, while the event loop has technically started by the time that `start` returns, the only way to provide messages to process is via the handle coming out of `start` - there is no global broadcasting that might pre-empt this. This means that if a "guaranteed first call" is needed, this can be achieved by simply sending a message and waiting for a response before sharing the handle.
 //!
-//! Once the event loop is established, it awaits a message indicating a call made against the shell, via any of the roles the actor might have, and then calls the appropriate method from the corresponding `performance` for any it receives.
+//! Once the event loop is established, it awaits a message being sent as a result of a call made to a method on the shell object, via any of the roles the actor might have, and then calls the appropriate method from the corresponding `performance` for any it receives.
 //!
 //! ### Synchronisation
 //!
-//! The order the actor responds to calls from different tasks is unspecified. The order the actor responds to calls made via two different roles is unspecified *even from the same task or from the same handle.* A call will *happen-before* another call if the second call is made via a method defined by the same role, and from the same task, as the first call. Calls made by an actor's own performances count as being made on the same task as each other.
+//! The order the actor responds to calls from different tasks is unspecified. The order the actor responds to calls made via two different roles is unspecified *even from the same task or from the same handle.* Calls made by an actor's own performances count as being made on the same task as each other.
 //!
+//! A call will *happen-before* another call if all of the following hold:
+//!   1) both calls are made via methods (not necessarily the same method) defined by the same role
+//!   2) both calls are made from the same task
+//!   3) the [`Envelope`] returned from the first call is `await`ed before the second call is made. If you do not need the return value of the first call, you must use [`Envelope::ignore`] to await only the sending, as implicitly dropping the `Envelope` by letting it leave scope does *not* meet this condition. (Dropped envelopes have no particular ordering with respect to anything, including other such envelopes.)
 //!
 //! ### Shutting down
 //!
 //! The actor can stop processing messages and shut down in several circumstances:
 //!
-//! 1. If a message handler panics, `catch` is called (or the panic value passed straight up to the [`ExitHandle`] if there is no `catch`) immediately. No further messages are processed, and attempting to send messages to the actor will fail by returning `Err` to the caller.
+//! 1. If a message handler panics, `catch` is called (or the panic value passed straight up to the [`ExitHandle`] if there is no `catch`) immediately. No further messages are processed, and attempting to send messages to the actor will fail by returning `Err` to the caller via the [`Envelope`].
 //! 2. If the [`Context::stop`] is called, no further messages are processed, calls against the actor will return `Err`, but the actor's `stop` function is called rather than `catch`. This similarly passes the returned value up to the [`ExitHandle`].
-//! 3. If the `Arc` that was returned from `start` and all of its copies drop, *and* no further messages are waiting to be processed, `stop` will be called as in case 2. By definition, it is not possible for an external client to be sending messages to the actor at this point. (Note that functions directly subscribing the actor to a future result, such as [`MessageStream::send_to`] implicitly hold an `Arc` and will preclude this case until that value yields to exhaustion.)
+//! 3. If the `Arc` that was returned from `start` and all of its copies drop, *and* no further messages are waiting to be processed, `stop` will be called as in case 2. By definition, it is not possible for an external client to be sending messages to the actor at this point. (Note that functions directly subscribing the actor to a future result, such as [`MessageStream::send_to`] implicitly hold an `Arc` and will preclude this case until that value yields to exhaustion.) As explained below, there is currently an indeterminate delay between this condition becoming true and `stop` actually being called - to be sure that the actor has completely stopped, `await` the [`ExitHandle`].
 //!
 //! **N.B:** Because method implementations can get hold of the actor's own handle via the [`Context`], then even if all other copies have dropped at any given time, a running event handler can "save" the actor by sending a new copy of the handle out of the actor. This is not treated as the actor being revived from having shut down, but instead it has not shut down in the first place.
 //!
@@ -172,9 +179,11 @@ pub use sendable::{Message, MessageStream};
 pub type Role2Payload<R> = <R as Role>::Payload;
 #[doc(hidden)]
 pub type Role2Receiver<R> = <<R as Role>::Channel as Channel>::Receiver;
+/// Internal use only
+///
 /// Shortcut to resolve a Role's channel's sender type.
 pub type Role2Sender<R> = <<R as Role>::Channel as Channel>::Sender;
-/// Shortcut to resolve the sender's error type. For now, this is always [`SendError`](`crate::tokio_export::sync::mpsc::error::SendError`)
+/// Internal - the type returned if a Role fails to send a message. For now, this is always [`SendError`](`crate::tokio_export::sync::mpsc::error::SendError`)
 pub type Role2SendError<R> = <Role2Sender<R> as RoleSender<ReturnEnvelope<R>>>::Error;
 
 #[doc(hidden)]

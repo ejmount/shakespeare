@@ -4,7 +4,7 @@ use super::returnval::ReturnEnvelope;
 /// The sender half of a channel used internally by a Role
 #[trait_variant::make(Send)]
 pub trait Sender<T: Send>: Sync + Send + Clone {
-	/// An error indicating the message failed to deliver. This likely indicates the actor crashed before receiving the message
+	/// An error indicating the message failed to deliver. This likely indicates the actor stopped before receiving the message
 	type Error: Send;
 	#[doc(hidden)]
 	async fn send(&self, msg: T) -> Result<(), Self::Error>;
@@ -56,12 +56,36 @@ pub trait Role: Sync + Send {
 
 /// Denotes that a Role can be sent `T` values
 ///
-/// A Role (specifically, the type, `dyn Role`) implementing this trait means that exactly one method of the Role has a parameter list corresponding to `T`. This means the actor can determine what method call is intended from the value alone, and so can work with [`crate::Message::send_to`] and similar. Methods explicitly defined in the Role can be called whether or not an `Accepts` implementation exists.
+/// A Role (specifically, the type, `dyn Role`) implementing this trait means that exactly one method of the Role has a parameter list corresponding to `T`. This means the actor can determine what method call is intended from the value alone - it is the only possibility - and so can work with [`Message::send_to`](crate::Message::send_to) and similar. Methods explicitly defined in the Role can be called whether or not an `Accepts` implementation exists.
 ///
 /// Because a single actor can implement multiple roles, and each role may have an implementation of this trait for the same value of `T`, you may need to disambiguate the call like so:
 /// ```ignore
 /// future.send_to(actor as Arc<dyn Role>)
 /// ```
+///
+/// As an example of a role and what values of `T` it implements this trait for:
+/// ```no_run
+/// use std::sync::Arc;
+///
+/// use shakespeare::{Accepts, role};
+/// use static_assertions::{assert_impl_one, assert_not_impl_any};
+///
+/// #[role]
+/// trait ARole {
+///     fn a_method(&self, a: usize) {}
+///     fn a_different_method(&self, a: usize) {}
+///     fn a_third_method(&self, a: usize, b: usize) {}
+///     fn a_nullary_method(&self) {}
+/// }
+///
+///
+/// assert_impl_one!(dyn ARole: Accepts<(usize, usize)>);
+/// assert_not_impl_any!(dyn ARole: Accepts<usize>);
+/// // The empty tuple is special - this is currently never implemented even when a nullary method implies it should be
+/// // This may be changed in the future
+/// assert_not_impl_any!(dyn ARole: Accepts<()>);
+/// ```
+///
 ///
 /// (This trait's implementations are normally automatically generated)
 pub trait Accepts<T>: Role {
@@ -79,7 +103,7 @@ impl<R: Role + ?Sized> Accepts<R::Payload> for R {
 
 /// Denotes that at least one method of a Role produces a `T`
 ///
-/// `Emits` is the dual of `Accepts` - it indicates at least one of the Role's methods returns a value of type `T`. The primary use for this is to express bounds for the [`crate::Envelope::forward_to`] method.
+/// `Emits` is the dual of [`Accepts`] - it indicates at least one of the Role's methods returns a value of type `T`. The primary use for this is to express bounds for the [`Envelope::forward_to`](crate::Envelope::forward_to) method.
 ///
 /// (This trait's implementations are normally automatically generated)
 pub trait Emits<T>: Role {

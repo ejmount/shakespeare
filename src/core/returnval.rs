@@ -60,11 +60,11 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 ///
 /// The caller is expected to do one of four things with this value:
 /// 1. nothing - that is, allowing it to drop will dispatch the message and have any return value thrown away, but *will not* wait for the message delivery to complete.
-/// 2. awaiting this value will wait for the actor to recive and process the message, then yield the return value to the caller
+/// 2. awaiting this value will wait for the actor to receive and process the message, then yield the return value to the caller
 /// 3. calling [`ignore()`][`Envelope::ignore`] and awaiting the resulting future *will wait* for the message to be sent, but will not wait for any return value.
 /// 4. calling [`forward_to`][`Envelope::forward_to`] will send the return value directly to a given actor's mailbox.
 ///
-/// **NB**: In case 1, there is no ordering established with other messages sent to the same receiver, even from the same sender. In all other cases, multiple messages to the same receiver from a given sender will be received in sending order. In all cases, ordering between messages sent to different receivers or from different senders is unspecified.
+/// **NB**: In case 1, there is no ordering established with other messages sent to the same receiver, even from the same sender. In all other cases, multiple messages to the same receiver from a given sender sent through the same handle will be received in sending order. In all cases, ordering between messages sent to different receivers or from different senders is unspecified.
 #[derive(Debug)]
 pub struct Envelope<DestRole, Output>
 where
@@ -113,11 +113,15 @@ where
 		.await
 	}
 
-	/// Arranges for the *return value* produced by processing the given [`Envelope`] to be forwarded to the given actor. Any return value produced by the receipient is ignored.
+	/// Arranges for the *return value* produced by processing this [`Envelope`] to be forwarded to the given actor, discarding any return value that the second actor produces.
 	///
-	/// An actor may want to call this method using its own handle as the destination, so that it receives the `Envelope`'s return value without `await`ing inside the message handler that's making the call, which would pause the event loop as a whole. However, tying this return value back to the message that led to the call currently has no specific support and is left to the developer.
+	/// The returned future becomes `Ready`
 	///
-	/// Equivalent to, but more efficient than, passing the same parameters to [`Message::send_to`] **including** that the recipient actor will be kept alive until the message is either processed or the source of the `Envelope` drops
+	/// An actor may want to call this method using its own handle as the destination, so that it receives the return value without `await`ing inside the message handler that's making the call, because an actor cannot service further messages until the handler returns. This means that an actor A sending a message to another actor B and awaiting the [`Envelope`] will not service messages until B's handler returns a value - if B also sends and then awaits a message to A, the two will deadlock, because A will not service the message B is waiting on until B returns a value.
+	///
+	/// While using this method and passing the actor's own handle as the `recipient` will avoid deadlocks - actor A will continue servicing messages - tying the returned value back to the original context currently has no specific support and is left to the developer.
+	///
+	/// Because [`Envelope`] is [`IntoFuture`], this is equivalent to, but more efficient than, passing the same parameters to [`Message::send_to`] **including** that the recipient actor will be kept alive until the message is either processed or the actor originating the [`Envelope`] shuts down.
 	///
 	/// # Errors
 	///
