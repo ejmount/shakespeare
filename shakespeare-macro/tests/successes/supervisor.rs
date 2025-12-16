@@ -89,7 +89,7 @@ pub mod Worker {
 
 	#[performance(canonical)]
 	impl Work for WorkerState {
-		async fn work(&mut self, ctx: &'_ mut Context<Self>) {
+		async fn work<'a>(&mut self, ctx: &'a mut Context<Self>) {
 			self.count += 1;
 			sleep(Duration::from_millis(50)).send_to(ctx.get_shell() as Arc<dyn Sleeper>);
 		}
