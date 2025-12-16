@@ -36,3 +36,4 @@ tokio-util = { version = "0.7.16", features = ["codec"] }
 tokio = { version = "1.48.0", features = ["net"] }
 futures = "0.3.31"
 tokio-stream = { version = "0.1.17", features = ["net"] }
+static_assertions = "1.1.0"
