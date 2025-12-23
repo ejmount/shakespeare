@@ -48,28 +48,43 @@ Additionally, Shakespeare currently runs exclusively on [tokio](https://tokio.rs
 
 ## Example
 
+The following is a demonstration of some of Shakespeare's capabilities. There is also a [chat server example](examples/chat.rs) showing these features in a more realistic context.
+
 ```rust
+use shakespeare::{actor, performance, role, ActorHandles, Envelope};
 use std::sync::Arc;
-use shakespeare::{actor, performance, role};
 use tokio::sync::mpsc;
 
 #[role]
-trait BasicRole {
-    fn inform(&mut self, val: usize);
-    fn get(&self) -> usize;
+trait BasicRole { // Defining a role is largely a normal trait definition, just with the attribute macro
+    fn inform(&self, val: usize); // Role methods can take any number of arguments of any reasonable type
+    fn get(&self) -> usize; // They can similarly return any reasonable type
 }
+// ("Reasonable" here means Sized, Send and with 'static lifetime)
+
 
 #[actor]
-mod AnActor {
-    struct StateA(mpsc::Sender<usize>);
+mod AnActor { // The name of an actor type is defined by the module name here
+    struct StateA(mpsc::Sender<usize>); // An actor's internal state type can be any struct, enum or union
+                                        // with any name, any number of fields/variants and any size.
+                                        // Any syntax for these is accepted - this example does not
+                                        // name the struct field, but it could do
+                                        // (Anonymous tuples are not allowed as state types)
 
     #[performance]
     impl BasicRole for StateA {
         async fn inform(&mut self, val: usize) {
+            // Even though the role was defined as taking &self and as non-async, the implementation can be either or both
+            // The macros will handle the glue
+
+            // In role implementations, `self` is the state type, i.e. `StateA` here
             self.0.send(val).await;
+            // this method doesn't do anything interesting, just passes the value back through the channel
+            // that the actor was given at startup
         }
         fn get(&self) -> usize {
-            42
+            4 // Chosen by fair dice roll, guaranteed to be random
+            // ...not that it needs to be random, this is just providing a return value we can retrieve later
         }
     }
 }
@@ -77,21 +92,46 @@ mod AnActor {
 
 #[tokio::main]
 async fn main() {
+    // We will give the actor a channel to send values back to us
+    // This is to demonstrate that actor methods can be async.
+    // There's no ordinary need to do this because we can also get hold of return values directly
     let (tx, mut rx) = mpsc::channel(1);
 
-    let actor_state = StateA(tx);
-    let actor: Arc<dyn BasicRole> = AnActor::start(actor_state).message_handle; // Actors can be upcast to a Role trait object
+    let actor_state = StateA(tx); // Nothing unusual is happening here, just initializing a value
 
+    // This calls the generated constructor, which starts the actor as a new task
+    // with the provided value as its state, i.e. with the sender we assigned.
+    let actor_handles = AnActor::start(actor_state);
+
+    // Starting the actor produces two handles
+    // - the message handle for sending messages/calling functions
+    // - the join handle to await the actor stopping and indicating successful shutdown or panic
+    let ActorHandles { message_handle, join_handle: _, .. } = actor_handles;
+    // In many cases, you may not care about the join_handle and can just ignore it
+
+    // the message handle can be upcast to a Role trait object
+    // Code working with actors via trait objects is more generic
+    let actor: Arc<dyn BasicRole> = message_handle;
+
+    // We send the actor messages by calling methods
+    // These calls return an "Envelope" to let you decide what to do with the return value
     {
-        let _ = actor.inform(100);
-        // can let the value drop to fire and forget, ignoring any return value from the actor
+        let _: Envelope<dyn BasicRole, _> = actor.inform(100);
+        // can let the Envelope drop to fire and forget, ignoring any return value from the actor
     }
+    // The message was sent to the actor after the closing brace, but since it arrived on a separate
+    // task, we must wait until that task is scheduled and sends us a value back on the sender we gave it.
+    // NB: Putting the following line inside the braces above would cause a deadlock
+    // because we would await the response before the Envelope dropped and sent the message
     let chan_response = rx.recv().await;
+
     assert_eq!(chan_response, Some(100));
 
-    let ret_value = actor.get().await; // But can also await to get a syncronous, strongly-typed return value
-
-    assert_eq!(ret_value, Ok(42));
+    // We can also directly await the Envelope to get a syncronous, strongly-typed return value
+    let ret_value = actor.get().await;
+    assert_eq!(ret_value, Ok(4));
+    // Its also possible in general the actor shuts down while we were waiting for the message,
+    // which would give us an Err when we awaited.
 }
 ```
 

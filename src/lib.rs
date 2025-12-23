@@ -33,14 +33,21 @@
 //!
 //! The starting point for defining a new actor is an `#[actor]` module block. The name of the actor shell type (from which `start` is called) is defined by the name of the module. As an example, to start the following, one would call `MyActor::start(MyState)`:
 //!
-//! ```ignore
+//! ```
+//! # use shakespeare::{actor, performance};
+//!
 //! #[actor]
-//! mod MyActor { // <-- This name can be any valid type name
-//! 	enum MyState { // <-- This name can also be any valid type name
-//! 		Some(Data),
+//! mod MyActor {
+//! 	// /\ This name can be any valid identifier
+//! 	enum MyState {
+//! 		// /\ This name can also be any valid type name
+//! 		// Could also be a struct or union
+//! 		SomeData(usize),
+//! 		OtherData(String),
 //! 		Empty,
 //! 	}
-//! 	// ...other items...
+//! # 	#[performance(canonical)] impl Empty for MyState { fn method(&self) {}}
+//! 	// ...
 //! }
 //! ```
 //!
@@ -50,18 +57,24 @@
 //!
 //! The module must also contain at least one `#[performance]` trait impl block:
 //!
-//! ```ignore
+//! ```
+//! # use shakespeare::{actor, performance, role};
+//! # #[actor] mod MyActor { 	struct MyState; 	#[performance] impl ARole for MyState { } }
+//! # #[role] trait ARole { fn a_method(&self) -> AnyReturnType; }
+//! # struct AnyReturnType;
+//!
 //! #[performance]
-//! impl ARole for MyState { // <-- this name should match the name you used previously
-//!     async fn a_method(&mut self, ...) -> ... {
-//!         // any code can go here
-//!         unimplemented!()
-//!     }
-//!     // Any number of other methods
+//! impl ARole for MyState {
+//! 	//          /\ the type name should match the name you used previously
+//! 	async fn a_method(&mut self /* any parameters */) -> AnyReturnType {
+//! 		// any code can go here
+//! 		unimplemented!()
+//! 	}
+//! 	// any other methods the ARole trait requires
 //! }
 //! ```
 //!
-//! While inherent `impl MyState` blocks are allowed within the module, there is currently no support for calling methods from such a block on the actor state from outside the actor, as the state value is not externally accessible - all externally callable methods must be defined on a performance. (See `canonical` performances later for a simplification of the common case) Conversely, free functions (i.e. with no `self`) defined inside such inherent `impl` blocks can be called as normal. Methods from such a block can be called on the state value from within a performance.
+//! While inherent `impl MyState` blocks are allowed within the module, there is currently no support for calling those methods on the actor state from outside the actor, as the state value is not externally accessible - all externally callable methods must be defined on a performance. (See `canonical` performances later for a simplification of the common case.) Conversely, free functions (i.e. with no `self`) defined inside inherent `impl` blocks can be called as normal. Methods from such a block *can* be called on the state value from within a performance.
 //!
 //! For methods inside a performance block, `Self` refers to the state type. (e.g. `MyState` above) The above is the "strongest" form of signature - method implementations that do not `await` anything can leave off the `await` keyword, and implementations that do not mutate the state object can take plain `&self`.
 //!
@@ -71,11 +84,14 @@
 //!
 //! Defining a role is syntatically a normal trait declaration, just with the macro attached:
 //!
-//! ```ignore
+//! ```
+//! # use shakespeare::role;
 //! #[role]
 //! trait ARole {
-//!     fn a_method(&mut self, ...) -> ...;
-//!     // Any number of other methods
+//! 	fn a_method(&mut self);
+//! 	fn another_method(&mut self, a: usize) -> String;
+//! 	// Any number of other methods
+//! 	// Methods can take any number of parameters and return almost any type
 //! }
 //! ```
 //!

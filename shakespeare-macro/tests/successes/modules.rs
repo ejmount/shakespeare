@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 fn do_a_thing() {}
 
 pub mod actor {
@@ -37,6 +35,8 @@ pub mod perf {
 
 #[tokio::test]
 pub async fn main() {
+	use std::sync::Arc;
+
 	use actor::FooState;
 	use role::RoleTrait;
 	use shakespeare::ActorHandles;
