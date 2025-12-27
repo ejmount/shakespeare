@@ -180,7 +180,7 @@ fn actor_internal(
 ///
 /// ## Context
 ///
-/// A [`Context`](https://docs.rs/shakespeare/latest/shakespeare/struct.Context.html) is how an implementation can manipulate the actor machinery itself, to e.g. explicitly stop the actor's message loop, or get a copy of the actor's message handle. To get a `Context`, the method inside the trait *implementation* should be written with `&'_ Context<Self>` (or, as needed, `&'_ mut Context<Self>`) as its **second** parameter, directly after the receiver and before any parameters written in the `trait` definition. (While it is allowed to name the lifetime, there is no use for doing so as no other value coming in or out of the method is allowed to be non-`'static`.) `Context` parameters are *not* needed in the trait definition and should not be written there under any circumstances. If the previous example needed access to the `Context` inside `a_method`, that would be written:
+/// A [`Context`](https://docs.rs/shakespeare/latest/shakespeare/struct.Context.html) is how an implementation can manipulate the actor machinery itself, to e.g. explicitly stop the actor's message loop, or get a copy of the actor's message handle. To get a `Context`, the method inside the trait *implementation* should be written with `&'_ Context<Self>` (or, as needed, `&'_ mut Context<Self>`) as its **second** parameter, directly after the receiver and before any parameters written in the `trait` definition. (While it is allowed to name the lifetime, there is no use for doing so as no other value coming in or out of the method is allowed to be non-`'static`.) `Context` parameters are *not* needed in the trait definition and should not be written there under any circumstances. Multiple actors implementing a Role may use (or not use) a `Context` inside a given method independently, regardless of the choices made by the other actors.  If the previous example needed access to the `Context` inside `a_method`, that would be written:
 /// ```
 /// use shakespeare::{Context, actor, performance, role};
 /// #[role]
@@ -220,7 +220,7 @@ fn actor_internal(
 /// 	}
 /// }
 /// ```
-/// In addition to defining the implementation for how `MyActor` implements `MyRole` as with the `#[performance]` examples seen so far, the above *also* defines the overall Role called `MyRole`. It is defined to match the signatures that `MyActor` implements - it contains a single method, `a_method`, which in turn takes a single `usize` as its parameter. Methods inside a canonical performance *are* allowed to use `Context` parameters as described previously, and the generated Role will remove the `Context` parameters automatically.
+/// In addition to defining the implementation for how `MyActor` implements `MyRole` as with the `#[performance]` examples seen so far, the above *also* defines the overall Role called `MyRole`. It is defined to match the signatures that `MyActor` implements - it contains a single method, `a_method`, which in turn takes a single `usize` as its parameter. Methods inside a canonical performance *are* allowed to use `Context` parameters as described previously, and the generated Role will remove the `Context` parameters automatically. As a result, if a second actor implements a Role defined by a canonical performance, then that actor's performances of the methods may use (or not use) a `Context` independently of the canonical one.
 ///
 /// Currently, a performance must be included inside the `#[actor]` module in order to be `canonical`.
 #[proc_macro_attribute]
@@ -248,14 +248,18 @@ fn performance_internal(
 ///
 /// The trait has the following restrictions:
 /// 1. it cannot have any associated constants or types
-/// 2. all functions must be methods and must take `&self` as receiver. (But see the documentation for [macro@performance])
-/// 3. all other parameters and all return types must have a lifetime of `'static`
-/// 4. Neither methods nor parameters can have "unbound" generic parameters, nor use `impl Trait` in either parameter or return position. (`Option<u32>` is allowed, `Option<T>` is not)
+/// 2. all functions must be methods and should take `&self` as receiver. (But see the documentation for [macro@performance]) Currently, `&mut self` is allowed but redundant - other receiver types are not allowed at all.
+/// 3. all other parameters and all return types must be `Send`, `Sized` and have a lifetime of `'static`
+/// 4. Neither methods nor parameters can have "unbound" generic parameters, nor use `impl Trait` in either parameter or return position. (`Option<u32>` is allowed, `Option<T>` is not) Role methods *are* allowed to be `async`, but it is not allowed to have the function return `impl Future`.
 ///
 /// Role methods may be async, and if they are, may `await` other futures. However, be aware that the actor's message loop will be blocked while awaiting - this risks deadlocks if other actors have sent it messages and are waiting for the return values. [`Envelope::forward_to`](https://docs.rs/shakespeare/latest/shakespeare/struct.Envelope.html#method.forward_to) may be useful to avoid this situation.
 ///
 /// Except for the above restrictions, a role is otherwise a normal trait and its methods can have any number of methods, input parameters, and return values of any type.
-/// (Be aware that, as with any other trait, extremely large inline types may cause performance impacts - these can be avoided by passing `Box` etc instead)
+/// (Be aware that, as with any other trait, extremely large inline types may cause performance impacts - these can be avoided by passing `Box`, etc, instead. Performance may also degrade faster than would be the case with synchronous function calls because large parameters will imply large message queue slots and the like.)
+///
+/// Note that it is always a mistake to include a [`Context`][1] parameter in a signature inside a standalone `#[role]` definition. Instead, it should be written only in the corresponding `#[performance]` method as the second parameter, directly after the `&self`/`&mut self`. This is currently not detected as an error, but calling such a method would require owning a [`Context`][1] value and it should not be possible to do that from external code.
+///
+/// [1]: https://docs.rs/shakespeare/latest/shakespeare/struct.Context.html
 ///
 /// Note the generated trait's methods will *not* have exactly the signatures written in the trait block. Instead, given a Role defined by:
 /// ```

@@ -88,8 +88,8 @@
 //! # use shakespeare::role;
 //! #[role]
 //! trait ARole {
-//! 	fn a_method(&mut self);
-//! 	fn another_method(&mut self, a: usize) -> String;
+//! 	fn a_method(&self);
+//! 	fn another_method(&self, a: usize) -> String;
 //! 	// Any number of other methods
 //! 	// Methods can take any number of parameters and return almost any type
 //! }
@@ -107,7 +107,7 @@
 //!
 //! ### Miscellenia
 //!
-//! A method inside a performance can define its *second* parameter (i.e. the one immediately after the `self`) as having a type of `&'_ mut Context<Self>` to get access to the [`Context`] object for the current actor, which includes the capability of getting the current actor's handle or shutting it down early. (If only a shared borrow is required, `&'_ Context<Self>` is also allowed.) The context parameter should *not* be included in any explicitly defined roles, and roles defined by `canonical` performances take this into account - it is used only inside performance definitions.
+//! A method inside a performance can define its *second* parameter (i.e. the one immediately after the `self`) as having a type of `&'_ mut Context<Self>` to get access to the [`Context`] object for the current actor, which includes the capability of getting the current actor's handle or shutting it down early. (If only a shared borrow is required, `&'_ Context<Self>` is also allowed.) The context parameter should *not* be included in any explicitly defined roles, and roles defined by `canonical` performances take this into account.
 //!
 //!
 //! ## Actor Lifetime

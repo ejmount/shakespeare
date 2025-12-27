@@ -115,7 +115,7 @@ where
 
 	/// Arranges for the *return value* produced by processing this [`Envelope`] to be forwarded to the given actor, discarding any return value that the second actor produces.
 	///
-	/// The returned future becomes `Ready`
+	/// The returned future becomes `Ready` when the message to the actor originating this [`Envelope`] has been enqueued.
 	///
 	/// An actor may want to call this method using its own handle as the destination, so that it receives the return value without `await`ing inside the message handler that's making the call, because an actor cannot service further messages until the handler returns. This means that an actor A sending a message to another actor B and awaiting the [`Envelope`] will not service messages until B's handler returns a value - if B also sends and then awaits a message to A, the two will deadlock, because A will not service the message B is waiting on until B returns a value.
 	///
@@ -125,7 +125,7 @@ where
 	///
 	/// # Errors
 	///
-	/// Can return an Err if the actor originating the Envelope stops before the Envelope's return value is delivered to the recipient
+	/// Can return an Err if the actor originating the Envelope stops before the message can be submitted.
 	pub async fn forward_to<RxRole>(
 		self,
 		recipient: Arc<RxRole>,
