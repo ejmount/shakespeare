@@ -64,7 +64,7 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 /// 3. calling [`ignore()`][`Envelope::ignore`] and awaiting the resulting future *will wait* for the message to be sent, but will not wait for any return value.
 /// 4. calling [`forward_to`][`Envelope::forward_to`] will send the return value directly to a given actor's mailbox.
 ///
-/// **NB**: In case 1, there is no ordering established with other messages sent to the same receiver, even from the same sender. In all other cases, multiple messages to the same receiver from a given sender sent through the same handle will be received in sending order. In all cases, ordering between messages sent to different receivers or from different senders is unspecified.
+/// **NB**: In case 1, there is no ordering established with other calls sent to the same receiver, even from the same sender.
 #[derive(Debug)]
 pub struct Envelope<DestRole, Output>
 where
