@@ -1,4 +1,4 @@
-//! This is an example shakespeare program that runs an all-to-all chatroom on telnet port 8000.
+//! This is an example shakespeare program that runs an all-to-all chatroom on TCP port 8000.
 //!
 //! Once started, press ctrl-C or equivalent to shut it down.
 //!
@@ -47,7 +47,10 @@ pub mod Client {
 
 	/// Called when the actor gracefully exits.
 	///
-	/// The TcpStream the client is subscribed to will hold an `Arc` until the socket closes, so even if the handles held by the Server are dropped, the Client actor would remain alive. However, calling `stop` inside the Context (as happens on an IO error) will shut down the actor and run *this* handler regardless of active handles.
+	/// The TcpStream the client is subscribed to will hold an `Arc` until the socket
+	/// closes, so even if the handles held by the Server are dropped, the Client actor
+	/// would remain alive. However, calling `stop` inside the Context (as happens
+	/// on an IO error) will shut down the actor and run *this* handler regardless of active handles.
 	///
 	/// This function (and `catch`) can have arbitrary return type, and that return type will be tracked as part of the `ActorOutcome`
 	fn stop(self) -> usize {
@@ -67,7 +70,7 @@ pub mod Client {
 			// This is normal tokio machinery to turn the TCP stream into a Stream of Strings
 			// representing each line of input
 			let framed = Framed::new(client, LinesCodec::new());
-			let (out_stream, in_stream) = framed.split();
+			let (out_stream, net_in_stream) = framed.split();
 
 			// The starting values of the new actor.
 			let client_state = ClientState {
@@ -84,11 +87,18 @@ pub mod Client {
 			} = Client::start(client_state);
 
 			// Joins the incoming network stream to the actor, so each incoming String
+			// is sent as a message as though [`NetClient::on_read`] had been called with it.
+			//
+			// `on_read` specifically is used because it is the only method on `NetClient` that accepts
+			// a `Result<String, LinesCodecError>` as its single parameter, which the macros recognise
+			// and use to implement `Accepts<Result<String, LinesCodecError>>` for `NetClient`.
+			// Calling `feed_to` on a `Stream<T>` requires `Accepts` for the corresponding T, in this case
+			// `Result<String, LinesCodecError>`
 			net_in_stream.feed_to(message_handle.clone() as Arc<dyn NetClient>);
 
 			// The join_handle is a Future that yields when the actor (the client we're building) stops
-			// We register this future to send its value to the relay so that the relay can then tidy up a client shutting down for internal reasons
-			// e.g. network or parse failure
+			// We register this future to send its value to the relay so that the relay can then tidy up
+			// a client shutting down for internal reasons e.g. network or parse failure
 			join_handle.send_to(relay);
 
 			// Return the handle for message-passing back to the caller.
@@ -102,12 +112,17 @@ pub mod Client {
 		/// Process a inputs decoded from the network stream.
 		/// If we have a valid line, sent it to the MsgRelay to distribute.
 		/// If decoding has failed, shuts the actor down.
+		///
+		/// This method being the only one with its set of parameters means that `dyn NetClient` implements
+		/// the `Accepts<Result<String, LinesCodecError>>` trait which in turn means that a `Stream<Result<String, LinesCodecError>>`
+		/// can be sent to this actor with [`MessageStream::feed_to`] in [`Client::new`]
 		fn on_read(&self, ctx: &'_ mut Context<Self>, val: Result<String, LinesCodecError>) {
 			match val {
 				Ok(msg) => {
-					self.relay.send_msg(self.id, msg);
+					self.relay.send_msg(self.id, msg.trim().to_owned());
 				}
-				Err(LinesCodecError::MaxLineLengthExceeded) => { /* Do nothing, we don't have a maximum length */
+				Err(LinesCodecError::MaxLineLengthExceeded) => {
+					unreachable!("We didn't set a maximum length");
 				}
 				Err(LinesCodecError::Io(_)) => {
 					ctx.stop();
@@ -142,8 +157,17 @@ pub mod Server {
 
 	impl ServerState {
 		/// Broadcast a message to all connected clients
-		async fn broadcast(&mut self, msg: String) {
-			println!("{msg}"); // Show the message on the local console as well, for visibility
+		async fn broadcast(&mut self, msg: String, user_id: Option<usize>) {
+			let msg = if let Some(id) = user_id {
+				format!("{id:>03}: {msg}")
+			} else {
+				msg
+			};
+
+			// Show the message on the local console as well, for visibility
+			// This function is used to broadcast join and leave messages as well as ordinary messages
+			// So this will cover those as well
+			println!("{msg}");
 
 			// Using this for mark-and-sweep deletes of dead clients.
 			// This is somewhat convoluted because we want to announce each client leaving the system
@@ -174,7 +198,8 @@ pub mod Server {
 		async fn remove_client(&mut self, client_id: usize) {
 			// Its possible this has been called twice for the same actor because e.g. we noticed the connection was dead before the actor wrapped up, so check something was actually removed before doing anything else.
 			if self.users.remove(&client_id).is_some() {
-				self.broadcast(format!("User {client_id} has left\n")).await;
+				self.broadcast(format!("User {client_id} has left\n"), None)
+					.await;
 			}
 		}
 	}
@@ -185,11 +210,11 @@ pub mod Server {
 		/// A client wants a message broadcast
 		async fn send_msg(&mut self, sender_id: usize, msg: String) {
 			// The `format` call isn't needed for anything except readability, broadcast() takes any string
-			self.broadcast(format!("{sender_id:000}: {msg}")).await;
+			self.broadcast(msg, Some(sender_id)).await;
 		}
 
 		/// A client left and the actor shutdown, so tell everyone.
-		/// The existence of this method (and the fact that it is the only one that accepts `ActorOutcome` as its only parameter) triggers the macros to implement [`Accepts<ActorOutcome<Client>>`](`shakespeare::Accepts`) for `MsgRelay`, which then allows [`Message::send_to`] to accept the join handle from spawning a [`Client`] in [`NetListener::listen`]
+		/// The existence of this method (and the fact that it is the only one that accepts `ActorOutcome` as its single parameter) triggers the macros to implement [`Accepts<ActorOutcome<Client>>`](`shakespeare::Accepts`) for `MsgRelay`, which then allows [`Message::send_to`] to accept the join handle from spawning a [`Client`] in [`NetListener::listen`]
 		async fn client_leaves(&mut self, outcome: ActorOutcome<Client>) {
 			// This happens to work because the Client returns the same type for both a graceful stop and a panic
 			// This is not required in general
@@ -218,7 +243,8 @@ pub mod Server {
 			self.users.insert(id, actor);
 
 			// Make the announcement a new client has joined
-			self.broadcast(format!("User {id} has entered\n")).await;
+			self.broadcast(format!("User {id} has entered\n"), None)
+				.await;
 		}
 	}
 }
