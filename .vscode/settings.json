@@ -1,5 +1,21 @@
 {
     "rust-analyzer.rustfmt.extraArgs": [
         "+nightly"
+    ],
+    "cSpell.ignoreWords": [
+        "Doctests",
+        "nonstandard",
+        "sendable"
+    ],
+    "cSpell.words": [
+        "attributelike",
+        "impls",
+        "itertools",
+        "mpsc",
+        "oneshot",
+        "returnval",
+        "strukt",
+        "supertrait",
+        "usize"
     ]
 }

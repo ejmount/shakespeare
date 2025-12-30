@@ -97,11 +97,11 @@ fn create_inherent_impl(
 ) -> Result<ItemImpl> {
 	let make_methods = |role_name: &&RoleName| -> Result<ImplItem> {
 		let field_name = role_name.queue_name();
-		let acccessor_name = role_name.sender_method_name();
+		let accessor_name = role_name.sender_method_name();
 
 		fallible_quote! {
 			#[doc(hidden)]
-			#actor_vis async fn #acccessor_name(&self, payload: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>
+			#actor_vis async fn #accessor_name(&self, payload: ::shakespeare::ReturnEnvelope<dyn #role_name>) -> Result<(), ::shakespeare::Role2SendError<dyn #role_name>>
 			{
 				self.#field_name.send(payload)
 			}

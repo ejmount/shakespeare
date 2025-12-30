@@ -22,7 +22,7 @@ pub trait Receiver<T: Send> {
 /// A marker trait describing a channel underlying a particular role
 /// Currently the only implementation is for unbounded tokio channels, but more implementations are expected in the future
 pub trait Channel {
-	/// Parameters used to construct the channel pair. Currently unused, here for futureproofing
+	/// Parameters used to construct the channel pair. Currently unused, here for future-proofing
 	type Input;
 	/// The type of item sent across the channel.
 	type Item: Send;
@@ -40,7 +40,7 @@ pub trait Channel {
 /// No internal details of this trait are relevant to external users, only whether it is implemented and its related implementations of [`Accepts`] and [`Emits`]
 #[trait_variant::make(Send)]
 // This logically *should* be 'static but the compiler can't deal with the lifetime bounds properly. See https://github.com/rust-lang/rust/issues/131488
-// The compiler seems to be OK if 'static is listed seperately in the signature of the functions that need it.
+// The compiler seems to be OK if 'static is listed separately in the signature of the functions that need it.
 pub trait Role: Sync + Send {
 	#[doc(hidden)]
 	type Payload: Sized + Send + 'static;

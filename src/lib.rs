@@ -82,7 +82,7 @@
 //!
 //! A performance implementation is allowed to be outside of the actor `mod` scope, in the same way that any other `impl ... for` block can be outside the module that defines the struct, but if it is elsewhere, the actor `mod` must contain a `#[performance] impl ARole for MyActor {}` block, including empty braces. A more detailed description along with other caveats can be found in [the full macro documentation](shakespeare_macro::performance).
 //!
-//! Defining a role is syntatically a normal trait declaration, just with the macro attached:
+//! Defining a role is syntactically a normal trait declaration, just with the macro attached:
 //!
 //! ```
 //! # use shakespeare::role;
@@ -105,14 +105,14 @@
 //! }
 //! ```
 //!
-//! ### Miscellenia
+//! ### Miscellanea
 //!
 //! A method inside a performance can define its *second* parameter (i.e. the one immediately after the `self`) as having a type of `&'_ mut Context<Self>` to get access to the [`Context`] object for the current actor, which includes the capability of getting the current actor's handle or shutting it down early. (If only a shared borrow is required, `&'_ Context<Self>` is also allowed.) The context parameter should *not* be included in any explicitly defined roles, and roles defined by `canonical` performances take this into account.
 //!
 //!
 //! ## Actor Lifetime
 //!
-//! There are several events in the actor's lifecycle that are accessed by optionally defining freestanding (i.e. outside of any `impl`) functions within the `#[actor]` module. Their names, inputs and events are:
+//! There are several events in the actor's lifecycle that are accessed by optionally defining free-standing (i.e. outside of any `impl`) functions within the `#[actor]` module. Their names, inputs and events are:
 //!
 //! * `stop(self)` - is called with the final value of the actor's state object when the actor shuts down without panicking
 //!	* `catch(self, Box<dyn Any + Send>)` - called in the event a method handler panics, being provided the final state value and the value passed to the `panic!` call
