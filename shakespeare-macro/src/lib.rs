@@ -107,7 +107,7 @@ fn parse_macro_input<T: Parse>(
 ///
 /// Other items, including inherent `impl S` blocks, will be passed through unmodified into the surrounding module.
 ///
-/// The macro then generates a new type with the same name as the module. This new type:
+/// The macro then generates a new proxy type, the "actor shell," with the same name as the module. This new type:
 /// 1. has a constructor function `start(state: S) -> ActorHandles<Self>`. (This function is currently *always* private to the parent module containing the `#[actor]` block - for now, you will need to write a wrapper to access it from a wider scope)
 /// 2. implements each role trait for which it has a performance.
 ///
@@ -116,6 +116,17 @@ fn parse_macro_input<T: Parse>(
 /// The actor `Arc` can be upcast to a `Arc<dyn MyRole>` (for an actor with a performance of `MyRole`) to allow for code that works generically over a given role.
 ///
 /// The `ActorHandles` also contains a `ExitHandle`, which is a future that will yield the value produced by the actor stopping, either successfully or by panic. It  is not necessary to implement `stop` or `catch` as above to use the `ExitHandle`.
+///
+/// ## Mailbox
+///
+/// Each method defined in the actor shell will produce an [`Envelope`][1] value that contains all of the method's parameters. When this [`Envelope`][1] is consumed (see that type's documentation) then this bundle of values is sent to a queue inside the actor (currently always an [tokio unbounded MPSC queue](https://docs.rs/tokio/latest/tokio/sync/mpsc/)), which is the actor's "mailbox." When the actor's `start` method is called, a new task is spawned that continually awaits for new messages arriving into the mailbox, and when one does arrive, the method from the corresponding [`macro@performance`] block is called. If this method is async, it is polled to completion before the task looks for new entries in the queue. (Be aware this may cause deadlocks if it is awaiting a Future that itself is waiting for the same actor to respond.) Once the method does run to completion, the return value may need to be passed back to the original caller of the Envelope value or dropped, but once the return value is handled, the actor's task then awaits for the next queue entry.
+///
+/// Internally, each method translates to a variant of an enum defined by the overall Role, which contains all of the method parameters inline. This means similar warnings to those about large enum variants - avoid methods which have parameters that take up a large number of bytes between them. If large types are involved, roles can take heap allocation pointers (`Box`, `Arc`, etc) in exactly the same way as they take the original value types.
+///
+/// As explained in more detail in the [crate index documentation][2], this loop spuriously wakes up occasionally.
+///
+/// [1]: https://docs.rs/shakespeare/latest/shakespeare/struct.Envelope.html
+/// [2]: https://docs.rs/shakespeare/latest/shakespeare/
 #[proc_macro_attribute]
 pub fn actor(attr: TokenStream, item: TokenStream) -> TokenStream {
 	actor_internal(attr.into(), item.into()).into()
@@ -151,7 +162,7 @@ fn actor_internal(
 /// #[actor]
 /// mod MyActor {
 /// 	struct State(u32);
-///     // /\ Can have any unique name and any number of fields; see the documentation for the #[actor] macro
+///     //      ⇧ Can have any unique name and any number of fields; see the documentation for the #[actor] macro
 /// 	#[performance]
 /// 	impl MyRole for State {
 /// 		async fn a_method(&mut self, a_param: usize) { // <-- Parameters and return type must match trait above, except as noted below
@@ -161,11 +172,11 @@ fn actor_internal(
 /// }
 /// ```
 /// As per the normal rules for trait impls, `self` within the method body refers to the state type - `State` in the example above. However, there are a number of caveats:
-/// 1) the Role trait always defines the method to take `&self` and to be synchronous.
-/// 2) the method as written in the `impl` block may be `async` (and so may `await` other futures) and it may take `&mut self` instead of `&self` as its own logic requires. If it does not need either of these capabilities, it can instead be written without the keywords, i.e. the `impl` method can be written to take `&self` instead of `&mut self` if the body does not mutate the actor state, and can be written without the `async` keyword if it does not `await` anything.
+/// 1) the Role trait should always define the method to take `&self` and to be synchronous. (Although it is currently allowed for them to be marked either `async` or take `&mut self`, the method on the shell will always be sync and take `&self`.)
+/// 2) the method as written in the `impl` block is effectively written *as if* the trait method was both `async` and taking `&mut self` - it may be `async` (and so may `await` other futures) and it may take `&mut self` instead of `&self`, but does not need to. If it does not need either of these capabilities, it can instead be written without the keywords, i.e. the `impl` method can be written to take `&self` instead of `&mut self` if the body does not mutate the actor state, and can be written without the `async` keyword if it does not `await` anything.
 /// 3) while role methods can have any number of parameters and any type of return value, they must conform to the requirements for a valid Role, see the [`macro@role`] documentation.
 ///
-/// Also as per normal language rules, the names of the trait and implementing type are allowed to be extended path names as well as single identifiers. Additionally, the `#[performance]` block is allowed to be outside the `#[actor]` module, but used this way, there must be an empty `#[performance]` block naming the  trait inside the module. As per the language allowing `impl` blocks outside the module defining the type, the `#[performance]` is allowed to be in a different path than the `#[actor]`. Doc-tests do not interact with modules in the usual manner, but see [this unit test][1] for an example.
+/// Also as per normal language rules, the names of the trait and implementing type are allowed to be extended path names as well as single identifiers. Additionally, the `#[performance]` block is allowed to be outside the `#[actor]` module, but used this way, there must be an empty `#[performance]` block naming the trait and state type inside the module. As per the language allowing `impl` blocks outside the module defining the type, the `#[performance]` is allowed to be in a different path than the `#[actor]`. Doc-tests do not interact with modules in the usual manner, but see [this unit test][1] for an example.
 ///
 /// Given a trait implementation, this macro generates corresponding methods for the actor shell type (`MyActor`) that pass the method's parameters as a message to the actor's mailbox and return an [`Envelope`][2], a Future-like value representing the return value of the method call. The actor continuously services messages from the mailbox by calling the corresponding method from the `performance` for each message in turn, and the return value of each call is provided back to the caller via the [`Envelope`][2] value. **Note**: that the actor cannot service later messages until the method returns. This has potential to create a deadlock if an actor has a method that awaits a `Future`, and the `Future` needs a pending message from the same actor to be serviced. (e.g. if actor A sends a message to actor B and awaits its return value and actor B's response to the message is to send a message to A and await the answer before returning, the two deadlock as they both wait for the other to return.)
 ///
@@ -257,7 +268,7 @@ fn performance_internal(
 /// Except for the above restrictions, a role is otherwise a normal trait and its methods can have any number of methods, input parameters, and return values of any type.
 /// (Be aware that, as with any other trait, extremely large inline types may cause performance impacts - these can be avoided by passing `Box`, etc, instead. Performance may also degrade faster than would be the case with synchronous function calls because large parameters will imply large message queue slots and the like.)
 ///
-/// Note that it is always a mistake to include a [`Context`][1] parameter in a signature inside a standalone `#[role]` definition. Instead, it should be written only in the corresponding `#[performance]` method as the second parameter, directly after the `&self`/`&mut self`. This is currently not detected as an error, but calling such a method would require owning a [`Context`][1] value and it should not be possible to do that from external code.
+/// Note that it is always a mistake to include a [`Context`][1] parameter in a signature inside a standalone `#[role]` definition. Instead, it should be written only in the corresponding `#[performance]` method as the second parameter, directly after the `&self`/`&mut self`. This is currently not detected as an error, but calling such a method would require owning a [`Context`][1] value and it should not be possible to do that from outside of this crate.
 ///
 /// [1]: https://docs.rs/shakespeare/latest/shakespeare/struct.Context.html
 ///

@@ -12,7 +12,7 @@
 //!
 //! ## Using actors
 //!
-//! With a tokio runtime running, (e.g. via `#[tokio::main]`) an actor instance is created by calling the `start` function on the actor's shell type, which consumes a value of the corresponding state type. The `start` function is currently defined in a way that means it is private and a sibling of the `#[actor]` module - if you want to expose it more widely (including outside of the crate, i.e. `pub`) you will have to define a wrapper function for now. This requirement may be relaxed in a future version.
+//! With a tokio runtime running, (e.g. via `#[tokio::main]`) an actor instance is created by calling the `start` function on the actor's shell type, which consumes a value of the corresponding state type. The `start` function is currently defined in a way that means it is private and a sibling of the `#[actor]` module that defines the overall actor - if you want to expose it more widely (including outside of the crate, i.e. `pub`) you will have to define a wrapper function for now. This requirement may be relaxed in a future version.
 //!
 //! The `start` function returns a [`ActorHandles`], which contains two values:
 //! * an [`ExitHandle`] - this is a [`Future`][`std::future::Future`] that yields when the actor exits, the value of which indicates whether the actor exited gracefully (all handles were dropped or a handler explicitly shut it down) or by one of the message handlers panicking. Dropping this value doesn't affect the actor's execution
@@ -38,9 +38,9 @@
 //!
 //! #[actor]
 //! mod MyActor {
-//! 	// /\ This name can be any valid identifier
+//! 	// ⇧ This name can be any valid identifier
 //! 	enum MyState {
-//! 		// /\ This name can also be any valid type name
+//! 		// ⇧ This name can also be any valid type name
 //! 		// Could also be a struct or union
 //! 		SomeData(usize),
 //! 		OtherData(String),
@@ -53,30 +53,36 @@
 //!
 //! The module can be named anything. It needs to contain exactly one `struct`, `enum` *or* `union`, which serves as the state type of the actor. This type can similarly have any name that does not collide with the module name, but must be `'static`, `Sized`, and cannot contain free generic parameters (`enum MyState<T>` would not be allowed) but there are no other restrictions on its content. It does not move after the actor is started, so storing large amounts of data inline is not a performance concern.
 //!
+//! While inherent `impl MyState` blocks are allowed within the module, there is currently no support for calling those methods on the actor state from outside the actor, as the state value is not externally accessible - all externally callable methods must be defined on a performance, discussed below. (See also `canonical` performances later for a simplification of the common case.) Methods from such a block *can* be called normally on the state value from within a performance or on state values *before* they are consumed by `start` - there is nothing unusual about the state type itself, the relevant values are simply only accessible at the point they are passed as parameters to a performance. Free functions (i.e. with no `self`) defined inside inherent `impl` blocks can also be called as normal.
+//!
 //! ### Performances
 //!
 //! The module must also contain at least one `#[performance]` trait impl block:
 //!
 //! ```
 //! # use shakespeare::{actor, performance, role};
-//! # #[actor] mod MyActor { 	struct MyState; 	#[performance] impl ARole for MyState { } }
-//! # #[role] trait ARole { fn a_method(&self) -> AnyReturnType; }
+//! #[role]
+//! trait ARole {
+//! 	fn a_method(&self) -> AnyReturnType;
+//! }
 //! # struct AnyReturnType;
-//!
-//! #[performance]
-//! impl ARole for MyState {
-//! 	//          /\ the type name should match the name you used previously
-//! 	async fn a_method(&mut self /* any parameters */) -> AnyReturnType {
-//! 		// any code can go here
-//! 		unimplemented!()
+//! #[actor]
+//! mod MyActor {
+//! 	struct MyState;
+//! 	#[performance]
+//! 	impl ARole for MyState {
+//! 		//          ⇧ the type name should match the name you used previously
+//! 		async fn a_method(&mut self /* any parameters */) -> AnyReturnType {
+//! 			// any code can go here
+//! 			unimplemented!()
+//! 		}
+//! 		// any other methods the ARole trait requires
 //! 	}
-//! 	// any other methods the ARole trait requires
 //! }
 //! ```
 //!
-//! While inherent `impl MyState` blocks are allowed within the module, there is currently no support for calling those methods on the actor state from outside the actor, as the state value is not externally accessible - all externally callable methods must be defined on a performance. (See `canonical` performances later for a simplification of the common case.) Conversely, free functions (i.e. with no `self`) defined inside inherent `impl` blocks can be called as normal. Methods from such a block *can* be called on the state value from within a performance.
+//! A performance is written like an ordinary trait implementation with a caveat: all methods in the trait are in reality `async` and receiving `&mut self`, but as with normal traits, method implementations that do not `await` anything can leave off the `async` keyword, and implementations that do not mutate the state object can take plain `&self`. (As might be expected, the `Self` type is the state type, e.g. `MyState`)
 //!
-//! For methods inside a performance block, `Self` refers to the state type. (e.g. `MyState` above) The above is the "strongest" form of signature - method implementations that do not `await` anything can leave off the `await` keyword, and implementations that do not mutate the state object can take plain `&self`.
 //!
 //! **N.B.** While an actor's message handler can `await` futures (whether from an [`Envelope`] or otherwise) the event loop cannot resume until the method returns. This risks deadlocks: if actor A sends and then awaits a message to actor B, and in response actor B sends and awaits a message to actor A, the two wil deadlock because A cannot service further messages (including the one B sent it) until it receives a response from  B, which is waiting on A. If you need to handle the return value from calling another actor (B) without blocking the original sender (A) by waiting on it, consider using [`Message::send_to`] or [`MessageStream::feed_to`] and passing the sender's handle.
 //!
@@ -147,7 +153,7 @@
 //!
 //! **N.B:** Because method implementations can get hold of the actor's own handle via the [`Context`], then even if all other copies have dropped at any given time, a running event handler can "save" the actor by sending a new copy of the handle out of the actor. This is not treated as the actor being revived from having shut down, but instead it has not shut down in the first place.
 //!
-//! As an implementation detail of making all of the above work, *every actor* has a watchdog timer that fires intermittently to check for case 3 above, *whether or not* handles to the actor remain live. As a result, there is both a marginal amount of CPU use even by idle actors, and also a finite "finalization" interval between processing stopping (i.e. the later of the last handle dropping and the last message handler completing) and the actor beginning to shut down by calling `stop`. The exact length and behaviour of this watchdog **is not part of ``SemVer`` compatibility**, and the behaviour may vary in future versions. Currently, this timer goes off 1 second (1000ms) after the last message was received, and recurs at the same rate if the actor is still alive at that point. This is considered a design issue and may be removed entirely in future versions.
+//! As an implementation detail of making all of the above work, *every actor* has a watchdog timer that fires intermittently to check for case 3 above, *whether or not* handles to the actor remain live. As a result, there is both a marginal amount of CPU use even by idle actors, and in some circumstances also a finite "finalization" interval between processing stopping (i.e. the later of the last handle dropping and the last message handler completing) and the actor beginning to shut down by calling `stop`. The exact length and behaviour of this watchdog **is not part of ``SemVer`` compatibility**, and the behaviour may vary in future versions. Currently, this timer goes off 1 second (1000ms) after the last message was received, and recurs at the same rate if the actor is still alive at that point. This is considered a design issue and may be removed entirely in future versions. If [`Context::stop`] is called or if the last message remaining in the queue is handled *after* the last message handle has dropped, there is no wait for the watchdog and the actor will shut down immediately after the last (or current, for `stop`) message handler finishes.
 
 #![forbid(unsafe_code)]
 #![forbid(future_incompatible)]

@@ -1,13 +1,13 @@
 # Shakespeare
 
 ![Crates.io Version](https://img.shields.io/crates/v/shakespeare)
+[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 [![docs.rs](https://img.shields.io/docsrs/shakespeare)](https://docs.rs/shakespeare/latest/shakespeare/)
 ![GitHub Release Date](https://img.shields.io/github/release-date/ejmount/shakespeare?label=latest%20release)
 [![Build](https://github.com/ejmount/shakespeare/actions/workflows/build.yml/badge.svg)](https://github.com/ejmount/shakespeare/actions/workflows/build.yml)
-[![codecov](https://codecov.io/gh/ejmount/shakespeare/branch/main/graph/badge.svg?token=2L6ZS8OK32)](https://codecov.io/gh/ejmount/shakespeare)
 ![Crates.io Total Downloads](https://img.shields.io/crates/d/shakespeare)
 
-Shakespeare is a pure Rust framework that focuses on ergonomics and extensibility in its implementation of the [actor model](https://en.wikipedia.org/wiki/Actor_model) for creating highly parallel yet safe and robust systems. Actors are run as tasks directly on top of [tokio](https://tokio.rs/) (with no "world" or "system" boundary) and run fully in parallel.
+Shakespeare is a safe, pure Rust framework that focuses on ergonomics and extensibility in its implementation of the [actor model](https://en.wikipedia.org/wiki/Actor_model) for creating highly parallel yet safe and robust systems. Actors are run as tasks directly on top of [tokio](https://tokio.rs/) (with no "world" or "system" boundary) and run fully in parallel.
 
 **Why do I want an actor system?** - The actor model describes a system in terms of interacting "actors," each of which has some sort of associated state, and which interact with other actors by asynchronously sending messages. Importantly, *only* the actor which owns any given data can directly read or write it, with other parts of the system needing to post a message to the owning actor to request the value change.
 
