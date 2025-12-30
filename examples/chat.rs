@@ -84,8 +84,7 @@ pub mod Client {
 			} = Client::start(client_state);
 
 			// Joins the incoming network stream to the actor, so each incoming String
-			// is sent as a message as though [`NetClient::on_read`] had been called with it
-			in_stream.send_to(message_handle.clone() as Arc<dyn NetClient>);
+			net_in_stream.feed_to(message_handle.clone() as Arc<dyn NetClient>);
 
 			// The join_handle is a Future that yields when the actor (the client we're building) stops
 			// We register this future to send its value to the relay so that the relay can then tidy up a client shutting down for internal reasons
@@ -205,7 +204,7 @@ pub mod Server {
 		/// Set up a newly arrived client up with a new actor to represent them and handle their messages.
 		/// Also announces the new entry to existing clients.
 		///
-		/// As with `client_leaves`, this being the unique method taking a `TcpStream` on the `NetListener` role means `dyn NetListener` implements [`Accepts<TcpStream>`](`shakespeare::Accepts`), which in turn means that the initial setup can call [`MessageStream::send_to`](`shakespeare::MessageStream::send_to`) with the [`Stream<TcpStream>`](`futures::Stream`) it builds out of the [`TcpListener`](`tokio::net::TcpListener`)
+		/// As with `client_leaves`, this being the unique method taking a `TcpStream` on the `NetListener` role means `dyn NetListener` implements [`Accepts<TcpStream>`](`shakespeare::Accepts`), which in turn means that the initial setup can call [`MessageStream::feed_to`](`shakespeare::MessageStream::feed_to`) with the [`Stream<TcpStream>`](`futures::Stream`) it builds out of the [`TcpListener`](`tokio::net::TcpListener`)
 		async fn listen(
 			&mut self,
 			ctx: &'_ mut Context<ServerState>, // this is handled specially by the macros, it does not count for `Accepts`
@@ -245,7 +244,7 @@ async fn main() {
 
 	// Joins the stream to the actor so that each new incoming `TcpStream` is sent as a message
 	// In this case, [`Server::listen`] will be called as each new TcpStream becomes ready.
-	client_stream.send_to(message_handle as Arc<dyn NetListener>);
+	client_stream.feed_to(message_handle as Arc<dyn NetListener>);
 
 	// Stops the main task until the Server actor shuts down. The value returned would indicate why the actor shut down.
 	// This example does not expect that to actually happen - instead, use ctrl-C or equivalent to force shut down.

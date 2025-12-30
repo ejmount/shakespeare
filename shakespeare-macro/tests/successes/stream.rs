@@ -19,7 +19,9 @@ pub mod CounterActor {
 	fn stop(self) -> usize {
 		self.count
 	}
-	fn catch(self, _: Box<dyn Any + Send>) {}
+	fn catch(self, _: Box<dyn Any + Send>) {
+		unreachable!()
+	}
 }
 
 #[tokio::test]
@@ -33,7 +35,7 @@ async fn main() {
 	let counter: Arc<dyn Counter> = message_handle;
 
 	let numbers = futures::stream::iter(0..10);
-	numbers.send_to(counter);
+	numbers.feed_to(counter);
 
 	assert_eq!(join_handle.await, ActorOutcome::Exit(45));
 }
