@@ -108,7 +108,7 @@ fn parse_macro_input<T: Parse>(
 /// Other items, including inherent `impl S` blocks, will be passed through unmodified into the surrounding module.
 ///
 /// The macro then generates a new type with the same name as the module. This new type:
-/// 1. has a constructor function `start(state: S) -> ActorHandles<Self>`. (This function is currently *always* private to the parent module containg the `#[actor]` block - for now, you will need to write a wrapper to access it from a wider scope)
+/// 1. has a constructor function `start(state: S) -> ActorHandles<Self>`. (This function is currently *always* private to the parent module containing the `#[actor]` block - for now, you will need to write a wrapper to access it from a wider scope)
 /// 2. implements each role trait for which it has a performance.
 ///
 /// The `ActorHandles` contains an `Arc` that refers to the actor object. This value is the interface for sending the actor messages and controls its lifetime. When the last `Arc` goes out of scope, the actor will finish processing any messages it has already received, call its `stop` function if one exists, and then drop its state. If a method handler inside a performance panics, the `catch` function will be called *instead of* `stop`.
@@ -129,7 +129,7 @@ fn actor_internal(
 	std::mem::drop(attr); // <-- Removes a clippy warning, because we need this exact signature for tests
 	match parse_macro_input(item) {
 		Ok(module) => match make_actor(module) {
-			Ok(actor_ouput) => actor_ouput.to_token_stream(),
+			Ok(actor_output) => actor_output.to_token_stream(),
 			Err(e) => e.into_compile_error().into_token_stream(),
 		},
 		Err(err) => err,
@@ -167,7 +167,7 @@ fn actor_internal(
 ///
 /// Also as per normal language rules, the names of the trait and implementing type are allowed to be extended path names as well as single identifiers. Additionally, the `#[performance]` block is allowed to be outside the `#[actor]` module, but used this way, there must be an empty `#[performance]` block naming the  trait inside the module. As per the language allowing `impl` blocks outside the module defining the type, the `#[performance]` is allowed to be in a different path than the `#[actor]`. Doc-tests do not interact with modules in the usual manner, but see [this unit test][1] for an example.
 ///
-/// Given a trait implementation, this macro generates corresponding methods for the actor shell type (`MyActor`) that pass the method's parameters as a message to the actor's mailbox and return an [`Envelope`][2], a Future-like value representing the return value of the method call. The actor continously services messages from the mailbox by calling the corresponding method from the `performance` for each message in turn, and the return value of each call is provided back to the caller via the [`Envelope`][2] value. **Note**: that the actor cannot service later messages until the method returns. This has potential to create a deadlock if an actor has a method that awaits a `Future`, and the `Future` needs a pending message from the same actor to be serviced. (e.g. if actor A sends a message to actor B and awaits its return value and actor B's response to the message is to send a message to A and await the answer before returning, the two deadlock as they both wait for the other to return.)
+/// Given a trait implementation, this macro generates corresponding methods for the actor shell type (`MyActor`) that pass the method's parameters as a message to the actor's mailbox and return an [`Envelope`][2], a Future-like value representing the return value of the method call. The actor continuously services messages from the mailbox by calling the corresponding method from the `performance` for each message in turn, and the return value of each call is provided back to the caller via the [`Envelope`][2] value. **Note**: that the actor cannot service later messages until the method returns. This has potential to create a deadlock if an actor has a method that awaits a `Future`, and the `Future` needs a pending message from the same actor to be serviced. (e.g. if actor A sends a message to actor B and awaits its return value and actor B's response to the message is to send a message to A and await the answer before returning, the two deadlock as they both wait for the other to return.)
 ///
 /// [1]: https://github.com/ejmount/shakespeare/blob/main/shakespeare-macro/tests/successes/modules.rs
 /// [2]: https://docs.rs/shakespeare/latest/shakespeare/struct.Envelope.html
@@ -204,7 +204,7 @@ fn actor_internal(
 ///
 /// ## Canonical performances
 ///
-/// Currently, all external method calls into an actor must be defined by some Role that the actor performs. However, it is expected that some Roles will have a single "primary" implementation, with other implementations (if any exist) being conceptually subsidary to that one, e.g. an actor would have some interface as required by the domain logic, but a mock implementation of that same interface (for testing outside interactions with the actor) would be subsidary, because the mock interface's only responsibility is to match the domain-logic original, and the mock will never drive changes in the original's interfaces. Conversely, some cases will involve multiple "equal" implementations, such as differing implementations for a database connection - in these cases, it's advisable to define the Role using the [macro](`macro@role`), and then define separate `#[performance]` blocks.
+/// Currently, all external method calls into an actor must be defined by some Role that the actor performs. However, it is expected that some Roles will have a single "primary" implementation, with other implementations (if any exist) being conceptually subsidiary to that one, e.g. an actor would have some interface as required by the domain logic, but a mock implementation of that same interface (for testing outside interactions with the actor) would be subsidiary, because the mock interface's only responsibility is to match the domain-logic original, and the mock will never drive changes in the original's interfaces. Conversely, some cases will involve multiple "equal" implementations, such as differing implementations for a database connection - in these cases, it's advisable to define the Role using the [macro](`macro@role`), and then define separate `#[performance]` blocks.
 ///
 /// For cases that do have a single primary implementation, the Role can be defined *implicitly* by the performance, by passing the `canonical` flag to the `#[performance]` attribute. The previous example can be equivalently written:
 /// ```

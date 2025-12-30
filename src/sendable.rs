@@ -40,7 +40,7 @@ pub trait MessageStream: Stream<Item: Send> + Send + 'static {
 	///
 	/// See the [`Accepts`] documentation for the conditions that allow an actor to use this function.
 	///
-	/// This function does not do anything to inform the actor when the stream closes, successfuly or otherwise. If sending the stream item to the actor fails, the stream will be dropped. If an actor explicitly shuts down with an active stream, the stream will be dropped with any remaining items unread. A sent stream prevents an actor shutting down from zero remaining handles until the stream runs out, and conversely, the stream running out will release the held handle.
+	/// This function does not do anything to inform the actor when the stream closes, successfully or otherwise. If sending the stream item to the actor fails, the stream will be dropped. If an actor explicitly shuts down with an active stream, the stream will be dropped with any remaining items unread. A sent stream prevents an actor shutting down from zero remaining handles until the stream runs out, and conversely, the stream running out will release the held handle.
 	fn send_to<R>(self, actor: Arc<R>)
 	where
 		Self: Sized,

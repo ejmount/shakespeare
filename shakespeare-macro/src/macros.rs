@@ -12,11 +12,11 @@ macro_rules! fallible_quote {
         {
             use syn::parse::Parser;
 
-            let toks = quote::quote! { $($tt)* };
-		    syn::parse::Parse::parse.parse2(toks.clone()).map_err(|e| {
+            let tokens = quote::quote! { $($tt)* };
+		    syn::parse::Parse::parse.parse2(tokens.clone()).map_err(|e| {
 			syn::parse::Error::new(
 				e.span(),
-				format!("shakespeare: internal error: {} at file {}:{} - this is likely a bug\n{toks}", e, file!(), line!()),
+				format!("shakespeare: internal error: {} at file {}:{} - this is likely a bug\n{tokens}", e, file!(), line!()),
 	    		)
     		})
         }

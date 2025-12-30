@@ -20,7 +20,7 @@ This has many of the same architectural benefits as micro-services bring to comp
 
 Applications that can benefit from the actor model include network servers of almost all kinds, messaging protocols like IRC and Matrix, distributed services like Kubernetes and Docker Swarm (and anything else using Raft consensus), and even some styles of video games.
 
-**Why do I want *Shakespeare*?** - Shakespeare focuses on generality and allowing the programmar maximum control over the results while minimizing runtime overhead. Its most significant features include:
+**Why do I want *Shakespeare*?** - Shakespeare focuses on generality and allowing the programmer maximum control over the results while minimizing runtime overhead. Its most significant features include:
 
 * **Polymorphic actors** - actors' interfaces ("roles") are a first-class consideration in Shakespeare, and ergonomically allowing an actor to have multiple roles, and a role to have multiple implementations, were important design considerations. Allowing code to work with dynamically chosen actors of a given role as easily as they can work with dynamically chosen implementations of a trait with `dyn Trait` was a primary use case. This enables not only polymorphism within application code, but also substituting mock actors in integration testing and the like.
   * If a role is exported publicly, downstream crates can implement it on their own actors exactly as with normal traits.
@@ -42,7 +42,7 @@ It is worth noting that Shakespeare currently does **not** offer any built-in su
 * Global/static "broadcasts" of any kind - by default, actors only have access to their own state and any static values your application code has defined.
 * Networking - while actor messages conceptually have the same semantics as remote procedure calls, Shakespeare currently only supports messages within a single host process. That said, an actor can receive a `Stream` of packets as normal if one is constructed out of a network socket such as with a [tokio codec](https://docs.rs/tokio-util/latest/tokio_util/codec/index.html).
 
-If neeeded, these capabilities are expected to be relatively straightforward to build in application code - one of the original imagined use cases involved "proxy" actors that implement a Role by forwarding the received messages to an actor on a remote host. If more support for these use cases is important to you, please raise an issue and leave your feedback.
+If needed, these capabilities are expected to be relatively straightforward to build in application code - one of the original imagined use cases involved "proxy" actors that implement a Role by forwarding the received messages to an actor on a remote host. If more support for these use cases is important to you, please raise an issue and leave your feedback.
 
 Additionally, Shakespeare currently runs exclusively on [tokio](https://tokio.rs/) but this may change in the future. It also currently uses only unbounded channels, but improving this is planned future work.
 
@@ -127,7 +127,7 @@ async fn main() {
 
     assert_eq!(chan_response, Some(100));
 
-    // We can also directly await the Envelope to get a syncronous, strongly-typed return value
+    // We can also directly await the Envelope to get a synchronous, strongly-typed return value
     let ret_value = actor.get().await;
     assert_eq!(ret_value, Ok(4));
     // Its also possible in general the actor shuts down while we were waiting for the message,

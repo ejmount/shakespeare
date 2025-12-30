@@ -19,7 +19,7 @@ type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
 pub enum ReturnPath<Payload: Send> {
 	#[default]
 	Discard,
-	// Send it onwards to another actor's mailbox by runnin a function
+	// Send it onwards to another actor's mailbox by running a function
 	Mailbox(Box<dyn Send + FnOnce(Payload) -> PinnedAction>),
 	// Send it directly back to the caller via the given sender
 	Immediate(Sender<Payload>),

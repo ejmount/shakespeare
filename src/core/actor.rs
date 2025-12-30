@@ -105,7 +105,7 @@ pub trait State {
 ///
 /// The most important value here is the `Arc<A>`, which is the handle needed to send messages to the actor. This is ref-counted, and the actor will begin the process of shutting down when the last handle drops.
 ///
-/// The `Handle<A>` is a future that enables awaiting on the actor's completion and retrieving its output value, either as a result of the last `Arc<A>` dropping or theh actor's message handlers panicking. However, if you do not need this value, the `Handle` can be discarded and the actor will continue running.
+/// The `Handle<A>` is a future that enables awaiting on the actor's completion and retrieving its output value, either as a result of the last `Arc<A>` dropping or the actor's message handlers panicking. However, if you do not need this value, the `Handle` can be discarded and the actor will continue running.
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct ActorHandles<A>
