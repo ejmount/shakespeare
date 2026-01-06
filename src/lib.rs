@@ -219,7 +219,6 @@ where
 	futures::future::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(fut))
 }
 
-#[doc(hidden)]
+#[cfg(doctest)]
 #[doc = include_str!("../README.md")]
-#[expect(dead_code)]
 struct ReadmeDoctests;
