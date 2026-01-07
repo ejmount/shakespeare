@@ -11,10 +11,10 @@ Shakespeare is a safe, pure Rust framework that focuses on ergonomics and extens
 
 **Why do I want an actor system?** - The actor model describes a system in terms of interacting "actors," each of which has some sort of associated state, and which interact with other actors by asynchronously sending messages. Importantly, *only* the actor which owns any given data can directly read or write it, with other parts of the system needing to post a message to the owning actor to request the value change.
 
-This has many of the same architectural benefits as micro-services bring to complex systems, but on a smaller scale and with less overhead. (Namely, that no serialization is needed for actors on the same host and heap-allocated data need not be moved at all) More specifically:
+This has many of the same architectural benefits as micro-services bring to complex systems, but on a smaller scale and with less overhead. (Namely, that no serialization is needed for actors on the same host and heap-allocated data need not be moved at all.) More specifically:
 
 * Any particular operation never needs to take locks, as it is the only possible writer of any value it has direct access to
-* Scheduling concerns do not intrude on the application logic embodied by the actors - the former can vary completely independently, and in most cases, an actor system will yield the same results whether the host has a single parallel thread or a hundred with no functionality changes.
+* Scheduling concerns do not intrude on the application logic embodied by the actors - the former can vary completely independently, and in most cases, an actor system will yield the same results whether the host has a single parallel thread or a hundred with no changes to the domain logic.
 * Actors' interfaces - and so allowed operations on the data - are declared explicitly rather than allowing a holder of a lock to make arbitrary changes to the shared value.
 * Because actors run concurrently by default, parallel execution and vertical scaling fall out "for free."
 
@@ -24,10 +24,10 @@ Applications that can benefit from the actor model include network servers of al
 
 * **Polymorphic actors** - actors' interfaces ("roles") are a first-class consideration in Shakespeare, and ergonomically allowing an actor to have multiple roles, and a role to have multiple implementations, were important design considerations. Allowing code to work with dynamically chosen actors of a given role as easily as they can work with dynamically chosen implementations of a trait with `dyn Trait` was a primary use case. This enables not only polymorphism within application code, but also substituting mock actors in integration testing and the like.
   * If a role is exported publicly, downstream crates can implement it on their own actors exactly as with normal traits.
-* **Rich interfaces** - a single role for an actor can support any number of messages and accompanying methods with no more boilerplate than the equivalent trait definition. Messages can include any number of input parameters of any `'static` type. This includes methods that return values, which can be returned to the caller - however, the choice of whether or not to wait for the response remains with the caller and can be made on a call-by-call basis.
+* **Rich interfaces** - a single role for an actor can support any number of messages and accompanying methods with no more boilerplate than the equivalent trait definition. Messages can include any number of input parameters and return any `'static` type. This includes methods that return values, which can be returned to the caller - however, the choice of whether or not to wait for the response remains with the caller and can be made on a call-by-call basis.
   * The common case of immediately `await`ing the response means the message works like an ordinary function call.
   * There is [special support](https://docs.rs/shakespeare/latest/shakespeare/struct.Envelope.html#method.forward_to) for relaying the returned value onwards to another actor without waiting for the remote processing to complete.
-* **Static validation** - Shakespeare extensively leverages Rust's type system - the most common flows of a message to and from an actor are statically typed throughout, and API functions express their preconditions at the type level where possible. The output of Shakespeare's macros is similarly statically-typed throughout, minimizing runtime overhead and offering more visibility to the optimizer.
+* **Static validation** - Shakespeare extensively leverages Rust's type system - the actor interfaces are strongly typed throughout, never require any more downcasting from the caller than the equivalent function call would, and library functions express their preconditions at the type level where possible. The output of Shakespeare's macros is similarly statically-typed throughout, minimizing runtime overhead and offering more visibility to the optimizer.
   * Sending a message to and then awaiting the response from an actor of known concrete type incurs *no* virtual function calls.
 * **Interoperability** - linking actors into the wider ecosystem of async code is designed to be easy - actor messages implement `Future`, and actors can treat [`Future`](https://docs.rs/shakespeare/latest/shakespeare/fn.send_future_to.html) and `Stream` objects as incoming messages with no indirection.
   * Conversely, message handlers within an actor can be `async` and can await arbitrary Futures, with actor messages simply being a special case.
@@ -39,12 +39,12 @@ For a full explanation of how all this works, see [the crate documentation](http
 
 It is worth noting that Shakespeare currently does **not** offer any built-in support for:
 
-* Global/static "broadcasts" of any kind - by default, actors only have access to their own state and any static values your application code has defined.
-* Networking - while actor messages conceptually have the same semantics as remote procedure calls, Shakespeare currently only supports messages within a single host process. That said, an actor can receive a `Stream` of packets as normal if one is constructed out of a network socket such as with a [tokio codec](https://docs.rs/tokio-util/latest/tokio_util/codec/index.html).
+* Global/static "broadcasts" of any kind - by default, actors only have access to their own state, method inputs, and any static values your application code has defined.
+* Networking - while actor messages conceptually have the same semantics as remote procedure calls, Shakespeare currently only supports messages within a single host process. That said, an actor can receive a `Stream` constructed out of a network socket such as with a [codec](https://docs.rs/tokio-util/latest/tokio_util/codec/index.html) by using [`feed_to`](https://docs.rs/shakespeare/latest/shakespeare/trait.MessageStream.html#method.feed_to), which will call the actor's method when network packets arrive.
 
-If needed, these capabilities are expected to be relatively straightforward to build in application code - one of the original imagined use cases involved "proxy" actors that implement a Role by forwarding the received messages to an actor on a remote host. If more support for these use cases is important to you, please raise an issue and leave your feedback.
+Shakespeare currently uses unbounded channels for all message queues, but allowing this to be customized is planned future work.
 
-Additionally, Shakespeare currently runs exclusively on [tokio](https://tokio.rs/) but this may change in the future. It also currently uses only unbounded channels, but improving this is planned future work.
+Additionally, Shakespeare currently runs exclusively on [tokio](https://tokio.rs/) but this may change in the future.
 
 ## Example
 
@@ -123,15 +123,15 @@ async fn main() {
     // task, we must wait until that task is scheduled and sends us a value back on the sender we gave it.
     // NB: Putting the following line inside the braces above would cause a deadlock
     // because we would await the response before the Envelope dropped and sent the message
-    let chan_response = rx.recv().await;
+    let channel_response = rx.recv().await;
 
-    assert_eq!(chan_response, Some(100));
+    assert_eq!(channel_response, Some(100));
 
-    // We can also directly await the Envelope to get a synchronous, strongly-typed return value
+    // We can also directly await the Envelope to get a strongly-typed return value
     let ret_value = actor.get().await;
     assert_eq!(ret_value, Ok(4));
-    // Its also possible in general the actor shuts down while we were waiting for the message,
-    // which would give us an Err when we awaited.
+    // Its also possible that the actor might shut down while we were waiting for the message,
+    // that would have given us an Err when we awaited.
 }
 ```
 
