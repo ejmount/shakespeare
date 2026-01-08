@@ -56,11 +56,11 @@ pub trait Role: Sync + Send {
 
 /// Denotes that a Role can be sent `T` values
 ///
-/// A Role (specifically, the type, `dyn Role`) implementing this trait means that exactly one method of the Role has a parameter list corresponding to `T`. This means the actor can determine what method call is intended from the value alone - it is the only possibility - and so can work with [`Message::send_to`](crate::Message::send_to) and similar. Methods explicitly defined in the Role can be called whether or not an `Accepts` implementation exists.
+/// A Role (specifically, the type, `dyn Role`) implementing this trait means that exactly one method of the Role has a parameter list corresponding to `T`. This means the actor can determine what method call is intended from the value alone - it is the only possibility - and so can work with [`Message::send_when_ready`](crate::Message::send_when_ready) and similar. Methods explicitly defined in the Role can be called whether or not an `Accepts` implementation exists.
 ///
 /// Because a single actor can implement multiple roles, and each role may have an implementation of this trait for the same value of `T`, you may need to disambiguate the call like so:
 /// ```ignore
-/// future.send_to(actor as Arc<dyn Role>)
+/// future.send_when_ready(actor as Arc<dyn Role>)
 /// ```
 ///
 /// As an example of a role and what values of `T` it implements this trait for:

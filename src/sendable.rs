@@ -7,15 +7,16 @@ use crate::{Accepts, ReturnEnvelope, ReturnPath};
 
 /// Extension utilities for [`Future<T>`]. Blanket implemented for all values that meet the requirements.
 pub trait Message: Future + Send + 'static {
-	/// Send a future value to an actor.
+	/// Send a value to an actor asynchronously.
 	///
-	/// The future's output will be delivered to the actor's mailbox when it resolves.
+	/// The given future is moved to a newly spawned task, and its output will be delivered to the actor's mailbox when it resolves.
 	/// See the [`Accepts`] documentation for the conditions that allow an actor to use this function.
 	///
 	/// See also [`MessageStream::feed_to`] if you have a [`Stream`] of items to deliver rather than a single value.
 	///
-	/// **N.B**: this function retains the `Arc<dyn Role>` for as long as the future is pending, and will keep the actor alive for that time.
-	fn send_to<R>(self, actor: Arc<R>)
+	/// **N.B**: the created task retains the `Arc<dyn Role>` for as long as the future is pending, and will keep the actor alive for that time
+	/// if it does not panic or explicitly stops.
+	fn send_when_ready<R>(self, actor: Arc<R>)
 	where
 		Self: Sized,
 		R: 'static + ?Sized + Accepts<<Self as Future>::Output>,

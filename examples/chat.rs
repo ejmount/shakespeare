@@ -38,16 +38,16 @@ pub mod Client {
 
 	/// [`Client`] internal state, tracking an ID number to identify the client, the socket and handle to a Relay.
 	pub struct ClientState {
-		id:         usize,
+		id:             usize,
 		/// Incoming messages are forwarded to the relay to be sent on to everyone else
-		relay:      Arc<dyn MsgRelay>,
+		relay:          Arc<dyn MsgRelay>,
 		/// The stream of outgoing (text) lines
-		out_stream: SplitSink<Framed<TcpStream, LinesCodec>, String>,
+		net_out_stream: SplitSink<Framed<TcpStream, LinesCodec>, String>,
 	}
 
 	/// Called when the actor gracefully exits.
 	///
-	/// The TcpStream the client is subscribed to will hold an `Arc` until the socket
+	/// The TCP stream the client is subscribed to will hold an `Arc` until the socket
 	/// closes, so even if the handles held by the Server are dropped, the Client actor
 	/// would remain alive. However, calling `stop` inside the Context (as happens
 	/// on an IO error) will shut down the actor and run *this* handler regardless of active handles.
@@ -57,7 +57,8 @@ pub mod Client {
 		self.id
 	}
 
-	/// This would run when message handlers panic, such as on IO error on write.
+	/// This would run when message handlers panic, such as because we wrote to the socket
+	/// and unwrapped the result
 	///
 	/// (We don't distinguish this from a graceful exit for simplicity)
 	fn catch(self, _err: Box<dyn Any + Send>) -> usize {
@@ -70,13 +71,13 @@ pub mod Client {
 			// This is normal tokio machinery to turn the TCP stream into a Stream of Strings
 			// representing each line of input
 			let framed = Framed::new(client, LinesCodec::new());
-			let (out_stream, net_in_stream) = framed.split();
+			let (net_out_stream, net_in_stream) = framed.split();
 
 			// The starting values of the new actor.
 			let client_state = ClientState {
 				id,
 				relay: relay.clone(),
-				out_stream,
+				net_out_stream,
 			};
 
 			// Start the actor running and then break out the handles for it
@@ -99,7 +100,7 @@ pub mod Client {
 			// The join_handle is a Future that yields when the actor (the client we're building) stops
 			// We register this future to send its value to the relay so that the relay can then tidy up
 			// a client shutting down for internal reasons e.g. network or parse failure
-			join_handle.send_to(relay);
+			join_handle.send_when_ready(relay);
 
 			// Return the handle for message-passing back to the caller.
 			message_handle
@@ -137,7 +138,7 @@ pub mod Client {
 			ctx: &'_ mut Context<Self>,
 			msg: String,
 		) -> Result<(), LinesCodecError> {
-			let result = self.out_stream.send(msg).await;
+			let result = self.net_out_stream.send(msg).await;
 			if result.is_err() {
 				ctx.stop();
 			}
@@ -214,7 +215,7 @@ pub mod Server {
 		}
 
 		/// A client left and the actor shutdown, so tell everyone.
-		/// The existence of this method (and the fact that it is the only one that accepts `ActorOutcome` as its single parameter) triggers the macros to implement [`Accepts<ActorOutcome<Client>>`](`shakespeare::Accepts`) for `MsgRelay`, which then allows [`Message::send_to`] to accept the join handle from spawning a [`Client`] in [`NetListener::listen`]
+		/// The existence of this method (and the fact that it is the only one that accepts `ActorOutcome` as its single parameter) triggers the macros to implement [`Accepts<ActorOutcome<Client>>`](`shakespeare::Accepts`) for `MsgRelay`, which then allows [`Message::send_when_ready`] to accept the join handle from spawning a [`Client`] in [`NetListener::listen`]
 		async fn client_leaves(&mut self, outcome: ActorOutcome<Client>) {
 			// This happens to work because the Client returns the same type for both a graceful stop and a panic
 			// This is not required in general

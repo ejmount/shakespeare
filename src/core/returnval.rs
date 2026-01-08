@@ -121,7 +121,7 @@ where
 	///
 	/// While using this method and passing the actor's own handle as the `recipient` will avoid deadlocks - actor A will continue servicing messages - tying the returned value back to the original context currently has no specific support and is left to the developer.
 	///
-	/// Because [`Envelope`] is [`IntoFuture`], this is equivalent to, but more efficient than, passing the same parameters to [`Message::send_to`] **including** that the recipient actor will be kept alive until the message is either processed or the actor originating the [`Envelope`] shuts down.
+	/// Because [`Envelope`] is [`IntoFuture`], this is equivalent to, but more efficient than, passing the same parameters to [`Message::send_when_ready`] **including** that the recipient actor will be kept alive until the message is either processed or the actor originating the [`Envelope`] shuts down.
 	///
 	/// # Errors
 	///
@@ -193,7 +193,7 @@ where
 		let val = self.val.take().unwrap();
 		let dest = self.dest.take().unwrap();
 
-		std::future::ready(val).send_to(dest);
+		std::future::ready(val).send_when_ready(dest);
 	}
 }
 
