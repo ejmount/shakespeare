@@ -193,7 +193,7 @@ where
 		let val = self.val.take().unwrap();
 		let dest = self.dest.take().unwrap();
 
-		std::future::ready(val).send_to(dest);
+		std::future::ready(val).send_when_ready(dest);
 	}
 }
 

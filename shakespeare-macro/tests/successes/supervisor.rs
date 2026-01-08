@@ -29,7 +29,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
+			join_handle.send_when_ready(ctx.get_shell() as Arc<dyn Listening>);
 			message_handle
 				.work()
 				.ignore()
@@ -44,7 +44,7 @@ pub mod Supervisor {
 				success: false,
 				count:   0,
 			});
-			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
+			join_handle.send_when_ready(ctx.get_shell() as Arc<dyn Listening>);
 			message_handle.work().await.unwrap();
 
 			let ActorHandles {
@@ -55,7 +55,7 @@ pub mod Supervisor {
 				success: true,
 				count:   0,
 			});
-			join_handle.send_to(ctx.get_shell() as Arc<dyn Listening>);
+			join_handle.send_when_ready(ctx.get_shell() as Arc<dyn Listening>);
 
 			sleep(Duration::from_millis(500)).await;
 			drop(message_handle);
@@ -91,7 +91,7 @@ pub mod Worker {
 	impl Work for WorkerState {
 		async fn work<'a>(&mut self, ctx: &'a mut Context<Self>) {
 			self.count += 1;
-			sleep(Duration::from_millis(50)).send_to(ctx.get_shell() as Arc<dyn Sleeper>);
+			sleep(Duration::from_millis(50)).send_when_ready(ctx.get_shell() as Arc<dyn Sleeper>);
 		}
 	}
 	#[performance(canonical)]
