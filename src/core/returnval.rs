@@ -1,17 +1,17 @@
+use std::any::type_name;
 use std::fmt::Debug;
 use std::future::IntoFuture;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, ready};
 
 use futures::Future;
-use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::{Receiver, Sender};
 
 use crate::{Accepts, Emits, Message, Role, Role2SendError};
 
-type PinnedAction = Pin<Box<dyn Send + Future<Output = ()>>>;
+type PinnedAction<T> = Pin<Box<dyn Send + Future<Output = T>>>;
 
 #[doc(hidden)]
 #[derive(Default)]
@@ -20,7 +20,7 @@ pub enum ReturnPath<Payload: Send> {
 	#[default]
 	Discard,
 	// Send it onwards to another actor's mailbox by running a function
-	Mailbox(Box<dyn Send + FnOnce(Payload) -> PinnedAction>),
+	Mailbox(Box<dyn Send + FnOnce(Payload) -> PinnedAction<()>>),
 	// Send it directly back to the caller via the given sender
 	Immediate(Sender<Payload>),
 }
@@ -90,9 +90,9 @@ where
 	}
 
 	pub(crate) fn unpack(mut self) -> (DestRole::Payload, Arc<DestRole>) {
-		let val = (self.val.take().unwrap(), self.dest.take().unwrap());
+		let (payload, dest) = (self.val.take().unwrap(), self.dest.take().unwrap());
 		std::mem::forget(self);
-		val
+		(payload, dest)
 	}
 
 	/// This method will wait for the message to arrive at the receiving actor, but will not wait for any return value, which will be dropped.
@@ -162,25 +162,25 @@ where
 	#[doc(hidden)]
 	type IntoFuture = ReturnCaster<DestRole, Output>;
 	/// The return received from the envelope can fail if the message handler doesn't complete
-	type Output = std::result::Result<Output, RecvError>;
+	type Output = Result<Output, EnvelopeErr<DestRole>>;
 
 	fn into_future(self) -> Self::IntoFuture {
 		let (payload, dest) = self.unpack();
 
-		let (return_path, rx) = ReturnPath::create_immediate();
+		let (return_path, recv_future) = ReturnPath::create_immediate();
 
 		let envelope = ReturnEnvelope {
 			payload,
 			return_path,
 		};
 
-		tokio::spawn(async move {
-			let _ = dest.enqueue(envelope).await;
-		});
+		let sending_fn = { async move || dest.enqueue(envelope).await }();
+		let sender: Option<PinnedAction<_>> = Some(Box::pin(sending_fn));
 
 		ReturnCaster {
-			future: rx.into_future(),
-			typ:    PhantomData {},
+			sender,
+			recv_future,
+			typ: PhantomData {},
 		}
 	}
 }
@@ -197,6 +197,50 @@ where
 	}
 }
 
+pub enum EnvelopeErr<R>
+where
+	R: Role + ?Sized,
+{
+	SendingError(Role2SendError<R>),
+	Hangup,
+}
+
+impl<R> Debug for EnvelopeErr<R>
+where
+	R: Role + ?Sized,
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let field = match self {
+			EnvelopeErr::SendingError(_) => "SendingError",
+			EnvelopeErr::Hangup => "Hangup",
+		};
+		f.debug_tuple(&format!("EnvelopeErr<{}>", type_name::<R>()))
+			.field(&field)
+			.finish()
+	}
+}
+
+impl<R> PartialEq for EnvelopeErr<R>
+where
+	R: Role + ?Sized,
+	Role2SendError<R>: PartialEq,
+{
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(EnvelopeErr::SendingError(e), EnvelopeErr::SendingError(f)) => e == f,
+			(EnvelopeErr::Hangup, EnvelopeErr::Hangup) => true,
+			_ => false,
+		}
+	}
+}
+
+impl<R> Eq for EnvelopeErr<R>
+where
+	R: Role + ?Sized,
+	Role2SendError<R>: Eq,
+{
+}
+
 #[doc(hidden)]
 #[pin_project::pin_project]
 /// A future that awaits on an [`Envelope`] being processed and appropriately casts the return value
@@ -207,23 +251,34 @@ pub struct ReturnCaster<R, V>
 where
 	R: Role + ?Sized,
 {
+	sender:      Option<PinnedAction<Result<(), Role2SendError<R>>>>,
 	#[pin]
-	future: <Receiver<<R as crate::Role>::Return> as IntoFuture>::IntoFuture,
-	typ:    PhantomData<V>,
+	recv_future: Receiver<<R as Role>::Return>,
+	typ:         PhantomData<V>,
 }
 
 impl<R, V> Future for ReturnCaster<R, V>
 where
-	R: Emits<V> + ?Sized,
+	R: Emits<V> + ?Sized + 'static,
 {
-	type Output = std::result::Result<V, RecvError>;
+	type Output = Result<V, EnvelopeErr<R>>;
 
-	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		let inner = self.project().future;
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		if let Some(sender) = &mut self.sender {
+			match ready!(sender.as_mut().poll(cx)) {
+				Ok(()) => {
+					self.sender.take();
+				}
+				Err(e) => return Poll::Ready(Err(EnvelopeErr::SendingError(e))),
+			}
+		}
 
-		inner
-			.poll(cx)
-			.map(|val| val.map(|returned_payload| R::from_return_payload(returned_payload)))
+		let inner = self.project().recv_future;
+
+		inner.poll(cx).map(|result| match result {
+			Ok(val) => Ok(R::from_return_payload(val)),
+			Err(_) => Err(EnvelopeErr::Hangup),
+		})
 	}
 }
 
@@ -235,8 +290,8 @@ where
 		write!(
 			f,
 			"ReturnCaster<{}, {}>",
-			core::any::type_name::<R>(),
-			core::any::type_name::<V>()
+			type_name::<R>(),
+			type_name::<V>()
 		)
 	}
 }
