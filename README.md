@@ -129,7 +129,7 @@ async fn main() {
 
     // We can also directly await the Envelope to get a strongly-typed return value
     let ret_value = actor.get().await;
-    assert_eq!(ret_value, Ok(4));
+    assert_eq!(ret_value.unwrap(), 4);
     // Its also possible that the actor might shut down while we were waiting for the message,
     // that would have given us an Err when we awaited.
 }

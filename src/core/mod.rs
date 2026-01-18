@@ -5,7 +5,7 @@ mod role;
 pub use role::{Accepts, Channel, Emits, Receiver, Role, Sender};
 
 mod returnval;
-pub use returnval::{Envelope, ReturnCaster, ReturnEnvelope, ReturnPath};
+pub use returnval::{Envelope, EnvelopeErr, ReturnCaster, ReturnEnvelope, ReturnPath};
 
 mod context;
 pub use context::Context;

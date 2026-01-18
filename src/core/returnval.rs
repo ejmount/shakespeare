@@ -197,11 +197,20 @@ where
 	}
 }
 
+/// Represents a problem with an [`Envelope`], either sending its message or waiting for a response.
 pub enum EnvelopeErr<R>
 where
 	R: Role + ?Sized,
 {
+	/// Couldn't send the Envelope to the actor to begin with.
+	///
+	/// This will currently only happen if the actor has shut down before the message could be delivered,
+	/// since the underlying queue is always an [`unbounded_channel`][`tokio::sync::mpsc::unbounded_channel`].
 	SendingError(Role2SendError<R>),
+	/// The message was delivered successfully, but there was no response.
+	///
+	/// This means that the actor either panicked (not necessarily in the handler for this message) or
+	/// called [`Context::stop`][`crate::Context::stop`].
 	Hangup,
 }
 
@@ -264,17 +273,21 @@ where
 	type Output = Result<V, EnvelopeErr<R>>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		// Send the message if we haven't already
 		if let Some(sender) = &mut self.sender {
 			match ready!(sender.as_mut().poll(cx)) {
 				Ok(()) => {
+					// If the sending was successful, throw away the sender future
 					self.sender.take();
 				}
 				Err(e) => return Poll::Ready(Err(EnvelopeErr::SendingError(e))),
 			}
 		}
+		// Future API says we shouldn't be called if we've returned Ready(Err), so
+		// we only get here if either the sending was successful or was already done previously
 
+		// Poll the receiver
 		let inner = self.project().recv_future;
-
 		inner.poll(cx).map(|result| match result {
 			Ok(val) => Ok(R::from_return_payload(val)),
 			Err(_) => Err(EnvelopeErr::Hangup),

@@ -186,8 +186,8 @@ mod sendable;
 mod tokio;
 
 pub use core::{
-	Accepts, ActorHandles, Context, Emits, Envelope, ExitHandle, Outcome as ActorOutcome, Role,
-	Shell as ActorShell, State as ActorState,
+	Accepts, ActorHandles, Context, Emits, Envelope, EnvelopeErr, ExitHandle,
+	Outcome as ActorOutcome, Role, Shell as ActorShell, State as ActorState,
 };
 #[doc(hidden)]
 pub use core::{
