@@ -61,7 +61,7 @@ impl<Payload: Send + 'static> ReturnPath<Payload> {
 /// The caller is expected to do one of four things with this value:
 /// 1. nothing - that is, allowing it to drop will dispatch the message and have any return value thrown away, but *will not* wait for the message delivery to complete.
 /// 2. awaiting this value will wait for the actor to receive and process the message, then yield the return value to the caller
-/// 3. calling [`ignore()`][`Envelope::ignore`] and awaiting the resulting future *will wait* for the message to be sent, but will not wait for any return value.
+/// 3. calling [`ignore_return()`][`Envelope::ignore_return`] and awaiting the resulting future *will wait* for the message to be sent, but will not wait for any return value.
 /// 4. calling [`forward_to`][`Envelope::forward_to`] will send the return value directly to a given actor's mailbox.
 ///
 /// **NB**: In case 1, there is no ordering established with other calls sent to the same receiver, even from the same sender.
@@ -101,7 +101,7 @@ where
 	///
 	/// This function may return `Err` if the actor has already stopped.
 	#[must_use = "The message will not be sent to the actor if this Future isn't processed"]
-	pub async fn ignore(self) -> Result<(), Role2SendError<DestRole>> {
+	pub async fn ignore_return(self) -> Result<(), Role2SendError<DestRole>> {
 		let (payload, dest) = self.unpack();
 
 		let return_path = ReturnPath::Discard;

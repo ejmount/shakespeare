@@ -32,7 +32,7 @@ pub mod Supervisor {
 			join_handle.send_when_ready(ctx.get_shell() as Arc<dyn Listening>);
 			message_handle
 				.work()
-				.ignore()
+				.ignore_return()
 				.await
 				.expect("Message send shouldn't fail at this stage");
 

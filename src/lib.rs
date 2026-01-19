@@ -141,7 +141,7 @@
 //! A call will *happen-before* another call if all of the following hold:
 //!   1) both calls are made via methods (not necessarily the same method) defined by the same role
 //!   2) both calls are made from the same task
-//!   3) the [`Envelope`] returned from the first call is `await`ed before the second call is made. If you do not need the return value of the first call, you must use [`Envelope::ignore`] to await only the sending, as implicitly dropping the `Envelope` by letting it leave scope does *not* meet this condition. (Dropped envelopes have no particular ordering with respect to anything, including other such envelopes.)
+//!   3) the [`Envelope`] returned from the first call is `await`ed before the second call is made. If you do not need the return value of the first call, you must use [`Envelope::ignore_return`] to await only the sending, as implicitly dropping the `Envelope` by letting it leave scope does *not* meet this condition. (Dropped envelopes have no particular ordering with respect to anything, including other such envelopes.)
 //!
 //! ### Shutting down
 //!
