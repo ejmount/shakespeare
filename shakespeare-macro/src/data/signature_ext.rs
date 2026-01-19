@@ -20,7 +20,7 @@ impl SignatureExt for Signature {
 	fn has_context_input(&self) -> bool {
 		if let Some(FnArg::Typed(PatType { ty, .. })) = self.inputs.iter().nth(1) {
 			if let Type::Reference(r) = &**ty {
-				r.lifetime.as_ref().is_some_and(|l| l.ident != "static")
+				r.lifetime.as_ref().is_none_or(|l| l.ident != "static")
 			} else {
 				false
 			}
