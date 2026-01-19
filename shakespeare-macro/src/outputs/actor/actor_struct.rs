@@ -118,11 +118,11 @@ fn create_inherent_impl(
 }
 
 fn shell_field_from_performance(perf: &PerformanceDecl) -> Result<Field> {
-	let role_name = &perf.role_name;
-	let field_name = role_name.queue_name();
+	let sender_type_name = perf.role_name.sender_type_name();
+	let field_name = perf.role_name.queue_name();
 
 	Field::parse_named
-		.parse2(quote! {#[doc(hidden)]  #field_name : shakespeare::Role2Sender<dyn #role_name> })
+		.parse2(quote! {#[doc(hidden)]  #field_name : #sender_type_name })
 		.map_err(|err| {
 			syn::parse::Error::new(
 				err.span(),

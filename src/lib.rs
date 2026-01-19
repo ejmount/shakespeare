@@ -204,7 +204,7 @@ pub type Role2Receiver<R> = <<R as Role>::Channel as Channel>::Receiver;
 /// Internal use only
 ///
 /// Shortcut to resolve a Role's channel's sender type.
-pub type Role2Sender<R> = <<R as Role>::Channel as Channel>::Sender;
+type Role2Sender<R> = <<R as Role>::Channel as Channel>::Sender;
 /// Internal - the type returned if a Role fails to send a message. For now, this is always [`SendError`](`crate::tokio_export::sync::mpsc::error::SendError`)
 pub type Role2SendError<R> = <Role2Sender<R> as RoleSender<ReturnEnvelope<R>>>::Error;
 

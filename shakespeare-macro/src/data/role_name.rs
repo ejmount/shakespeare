@@ -1,9 +1,10 @@
 use convert_case::{Case, Casing};
 use proc_macro2::Ident;
 use quote::{ToTokens, format_ident};
-use syn::{Path, PathSegment};
+use syn::{Path, PathSegment, TypePath};
 
 use super::MethodName;
+use crate::macros::fallible_quote;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RoleName(Path);
@@ -40,6 +41,11 @@ impl RoleName {
 	pub(crate) fn sender_method_name(&self) -> Ident {
 		let field_name = self.queue_name();
 		format_ident!("push_to_{field_name}")
+	}
+
+	pub(crate) fn sender_type_name(&self) -> TypePath {
+		let path = &self.0;
+		fallible_quote! { <<dyn #path as ::shakespeare::Role>::Channel as ::shakespeare::Channel>::Sender }.unwrap()
 	}
 }
 
